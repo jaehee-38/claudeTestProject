@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/jaehee/workspace-claude/first-project/gradle/wrapper)",
+      "Bash(mkdir -p /Users/jaehee/workspace-claude/first-project/src/main/java/com/example/firstproject/controller)",
+      "Bash(mkdir -p /Users/jaehee/workspace-claude/first-project/src/main/java/com/example/firstproject/service)",
+      "Bash(mkdir -p /Users/jaehee/workspace-claude/first-project/src/main/java/com/example/firstproject/repository)",
+      "Bash(mkdir -p /Users/jaehee/workspace-claude/first-project/src/main/java/com/example/firstproject/entity)",
+      "Bash(gradle wrapper *)",
+      "Bash(java -version)",
+      "Bash(curl -sL \"https://services.gradle.org/distributions/gradle-8.8-bin.zip\" -o /tmp/gradle-8.8-bin.zip)",
+      "Bash(unzip -q /tmp/gradle-8.8-bin.zip -d /tmp/)",
+      "Bash(/tmp/gradle-8.8/bin/gradle wrapper *)",
+      "Bash(./gradlew bootRun)",
+      "Bash(echo \"PID=$!\")",
+      "Bash(curl -s http://localhost:8080/)",
+      "Bash(curl -s http://localhost:8080/hello)",
+      "Read(//tmp/**)",
+      "Bash(jobs -l)"
+    ]
+  }
+}

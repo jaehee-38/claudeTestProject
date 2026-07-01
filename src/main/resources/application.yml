@@ -1,0 +1,28 @@
+spring:
+  # MySQL 설치 후 아래 주석을 해제하고 autoconfigure.exclude 블록은 삭제하세요
+  # datasource:
+  #   url: jdbc:mysql://localhost:3306/first_project?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+  #   username: root
+  #   password: your_password
+  #   driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # jpa:
+  #   hibernate:
+  #     ddl-auto: update
+  #   show-sql: true
+  #   properties:
+  #     hibernate:
+  #       format_sql: true
+  #       dialect: org.hibernate.dialect.MySQLDialect
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+
+  jackson:
+    time-zone: Asia/Seoul
+
+server:
+  port: 8080

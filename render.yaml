@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: vocab-app
+    env: java
+    plan: free
+    buildCommand: ./gradlew clean build -x test
+    startCommand: java -jar build/libs/*.jar

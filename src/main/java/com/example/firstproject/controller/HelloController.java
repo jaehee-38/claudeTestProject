@@ -9,8 +9,8 @@ import java.util.Map;
 @RestController
 public class HelloController {
 
-    @GetMapping("/")
-    public ResponseEntity<Map<String, String>> root() {
+    @GetMapping("/api/health")
+    public ResponseEntity<Map<String, String>> health() {
         return ResponseEntity.ok(Map.of(
                 "status", "ok",
                 "message", "Spring Boot is running!"
@@ -18,7 +18,9 @@ public class HelloController {
     }
 
     @GetMapping("/hello")
-    public ResponseEntity<String> hello() {
-        return ResponseEntity.ok("Hello , World!");
+    public ResponseEntity<Map<String, String>> hello() {
+        return ResponseEntity.ok(Map.of(
+                "message", "Hello, World!"
+        ));
     }
 }

@@ -16,4 +16,12 @@ public class Example {
 
     @Column(nullable = false, length = 100)
     private String name;
+
+    public Example(String name) {
+        this.name = name;
+    }
+
+    public void changeName(String name) {
+        this.name = name;
+    }
 }

@@ -1,25 +1,25 @@
 spring:
-  # MySQL 설치 후 아래 주석을 해제하고 autoconfigure.exclude 블록은 삭제하세요
-  # datasource:
-  #   url: jdbc:mysql://localhost:3306/first_project?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-  #   username: root
-  #   password: your_password
-  #   driver-class-name: com.mysql.cj.jdbc.Driver
+  # 로컬에서는 프로젝트 루트의 .env 파일에서 DB 접속 정보를 읽습니다 (Git에 올라가지 않음).
+  # Render 같은 배포 환경에서는 대시보드의 Environment 변수로 같은 이름의 값을 넣으면 됩니다.
+  config:
+    import: optional:file:.env[.properties]
 
-  # jpa:
-  #   hibernate:
-  #     ddl-auto: update
-  #   show-sql: true
-  #   properties:
-  #     hibernate:
-  #       format_sql: true
-  #       dialect: org.hibernate.dialect.MySQLDialect
+  # TiDB Cloud Serverless (MySQL 호환)
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
 
   jackson:
     time-zone: Asia/Seoul

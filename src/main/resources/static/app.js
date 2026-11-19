@@ -262,15 +262,17 @@ async function dashStocks() {
     return;
   }
   const shown = list.items.slice(0, DASH_STOCKS);
-  const names = await nameLookup();
   body.innerHTML = `
     <div class="dlist">${shown.map((s) => `
       <a class="r" href="#/stock/${esc(s.code)}" data-code="${esc(s.code)}">
-        <span class="nm">${esc(s.name || names[s.code] || s.code)}<small>${esc(s.code)}</small></span>
+        <span class="nm"><span class="nm-text">${esc(s.name || s.code)}</span><small>${esc(s.code)}</small></span>
         <span class="vals"><span class="skel sm" style="width:90px"></span></span>
       </a>`).join('')}
     </div>
     <div class="dnote">${list.source === 'held' ? '관심종목이 없어 보유 주식을 보여줍니다.' : ''}${list.items.length > DASH_STOCKS ? ` 외 ${list.items.length - DASH_STOCKS}개` : ''}</div>`;
+
+  // 이름이 없는 종목은 내 투자에 등록한 이름으로 나중에 채웁니다 (내 투자 로딩을 기다리지 않음)
+  fillNames(body, shown.filter((s) => !s.name).map((s) => s.code));
 
   // 종목마다 따로 불러와서 온 순서대로 채웁니다 (모의투자는 서버가 호출 간격을 둠)
   shown.forEach(async (s) => {
@@ -527,6 +529,17 @@ async function nameLookup() {
   return names;
 }
 
+/** 이름 없이 코드로 먼저 그려둔 행에, 이름을 찾는 대로 채워 넣습니다 */
+async function fillNames(container, codes) {
+  if (!codes.length) return;
+  const names = await nameLookup();
+  codes.forEach((code) => {
+    if (!names[code]) return;
+    const el = container.querySelector(`[data-code="${CSS.escape(code)}"] .nm-text`);
+    if (el) el.textContent = names[code];
+  });
+}
+
 $('#stock-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const code = $('#stock-code').value.trim().toUpperCase();
@@ -621,15 +634,15 @@ async function renderWatchTable() {
     emptyRow(tbody, 5, '관심종목이 없습니다. 종목을 조회한 뒤 ☆ 를 눌러 추가하세요.');
     return;
   }
-  const names = await nameLookup();
   tbody.innerHTML = watch.map((w) => `
     <tr data-code="${esc(w.code)}">
-      <td><a class="lnk" href="#/stock/${esc(w.code)}">${esc(w.name || names[w.code] || w.code)}</a><span class="code">${esc(w.code)}</span></td>
+      <td><a class="lnk nm-text" href="#/stock/${esc(w.code)}">${esc(w.name || w.code)}</a><span class="code">${esc(w.code)}</span></td>
       <td class="num q-price"><span class="skel sm" style="width:70px;margin-left:auto"></span></td>
       <td class="num q-change"></td>
       <td class="num q-rate"></td>
       <td><div class="row-actions"><button class="btn ghost icon" data-unwatch="${esc(w.code)}">삭제</button></div></td>
     </tr>`).join('');
+  fillNames(tbody, watch.filter((w) => !w.name).map((w) => w.code));
   watch.forEach(async (w) => {
     const row = tbody.querySelector(`tr[data-code="${CSS.escape(w.code)}"]`);
     try {

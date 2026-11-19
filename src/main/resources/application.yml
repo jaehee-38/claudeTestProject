@@ -10,6 +10,19 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    # TiDB Cloud Serverless 는 한동안 안 쓰는 연결을 서버 쪽에서 끊습니다.
+    # 그대로 두면 죽은 연결을 붙잡고 최대 30초를 기다리므로:
+    #  - keepalive-time: 1분마다 놀고 있는 연결에 신호를 보내 끊기지 않게 함
+    #  - max-lifetime: 5분이 지난 연결은 새 연결로 교체
+    #  - connection-timeout: 연결을 못 얻으면 30초가 아니라 10초 안에 포기
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 120000
+      keepalive-time: 60000
+      max-lifetime: 300000
+      connection-timeout: 10000
+      validation-timeout: 3000
 
   jpa:
     hibernate:

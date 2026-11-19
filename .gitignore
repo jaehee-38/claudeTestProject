@@ -38,3 +38,6 @@ logs/
 
 ### Secrets ###
 .env
+
+# KIS 접근토큰 캐시
+.kis-token.json

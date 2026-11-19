@@ -3,6 +3,7 @@ package com.example.firstproject.service;
 import com.example.firstproject.common.ApiException;
 import com.example.firstproject.dto.ExchangeRateDto;
 import com.example.firstproject.dto.GoldPriceDto;
+import com.example.firstproject.dto.HoldingDto;
 import com.example.firstproject.dto.HoldingRequest;
 import com.example.firstproject.dto.PortfolioDto;
 import com.example.firstproject.entity.AssetType;
@@ -142,6 +143,19 @@ public class PortfolioService {
     private static BigDecimal percent(BigDecimal profit, BigDecimal cost) {
         if (cost == null || cost.signum() == 0) return null;
         return profit.multiply(HUNDRED).divide(cost, 2, RoundingMode.HALF_UP);
+    }
+
+    // ---------- 원본 목록 (관리자 화면) ----------
+
+    /** 시세를 붙이지 않은 DB 원본 목록. 외부 API 를 부르지 않아서 빠릅니다 */
+    @Transactional(readOnly = true)
+    public List<HoldingDto> listRaw() {
+        return holdingRepository.findAllByOrderByAssetTypeAscIdAsc().stream().map(HoldingDto::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public long count() {
+        return holdingRepository.count();
     }
 
     // ---------- 등록 / 수정 / 삭제 ----------

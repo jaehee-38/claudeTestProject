@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>관리자 로그인</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .login { max-width: 360px; margin: 12vh auto 0; }
+  .login form { display: flex; flex-direction: column; gap: 10px; }
+  .login label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--text-sub); }
+  .login label input { font-size: 14px; }
+  .login .brand { margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="login card">
+    <div class="brand"><span class="brand-mark">◆</span><h1>My Invest <span class="badge">관리자</span></h1></div>
+    <div id="msg"></div>
+    <form method="post" action="/admin/login">
+      <label>아이디<input name="username" autocomplete="username" value="admin" required></label>
+      <label>비밀번호<input name="password" type="password" autocomplete="current-password" required autofocus></label>
+      <button class="btn primary" type="submit">로그인</button>
+    </form>
+    <p class="small muted" style="margin:14px 0 0"><a href="/" style="color:inherit">← 사용자 화면으로</a></p>
+  </div>
+</div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const msg = q.has('error') ? ['msg', '아이디 또는 비밀번호가 올바르지 않습니다.']
+            : q.has('logout') ? ['msg info', '로그아웃했습니다.'] : null;
+  if (msg) document.getElementById('msg').innerHTML = `<div class="${msg[0]}">${msg[1]}</div>`;
+</script>
+</body>
+</html>

@@ -39,6 +39,23 @@ spring:
 
 server:
   port: ${PORT:8080}
+  # Codespaces / Render 는 프록시 뒤에서 돌기 때문에, 리다이렉트를 "/admin/login" 같은 상대 주소로 보냅니다
+  # (절대 주소면 http://localhost:8080/... 로 나가서 브라우저가 엉뚱한 곳으로 감)
+  forward-headers-strategy: native
+  tomcat:
+    use-relative-redirects: true
+  servlet:
+    session:
+      timeout: 60m          # 관리자 로그인 유지 시간
+      tracking-modes: cookie  # 주소창에 ;jsessionid=... 가 붙지 않게
+      cookie:
+        http-only: true
+        same-site: lax      # 다른 사이트에서 관리자 요청을 대신 보내지 못하게
+
+# 관리자 페이지(/admin) 로그인 정보. ADMIN_PASSWORD 가 비어 있으면 관리자 페이지는 잠겨 있습니다.
+admin:
+  username: ${ADMIN_USERNAME:admin}
+  password: ${ADMIN_PASSWORD:}
 
 # 외부 시세 API 설정. 키는 모두 .env 에서 읽고, 비어 있으면 해당 기능만 "키 없음" 안내를 보여줍니다.
 invest:

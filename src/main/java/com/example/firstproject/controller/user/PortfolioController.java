@@ -1,4 +1,4 @@
-package com.example.firstproject.controller;
+package com.example.firstproject.controller.user;
 
 import com.example.firstproject.dto.HoldingRequest;
 import com.example.firstproject.dto.PortfolioDto;

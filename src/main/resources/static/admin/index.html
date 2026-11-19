@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Invest 관리자</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="shell">
+
+  <header class="top">
+    <a class="brand" href="/admin/">
+      <span class="brand-mark">◆</span>
+      <h1>My Invest <span class="badge">관리자</span></h1>
+    </a>
+    <div class="actions">
+      <a class="btn ghost icon" href="/">사용자 화면으로 →</a>
+      <form method="post" action="/admin/logout"><button class="btn ghost icon" type="submit">로그아웃</button></form>
+    </div>
+  </header>
+
+  <div id="msg"></div>
+
+  <!-- 개요 -->
+  <div class="panel-head"><h2>개요</h2><button class="btn ghost icon" id="reload">새로고침</button></div>
+  <div class="cards" id="overview">
+    <div class="card"><div class="label">보유 자산</div><div class="value"><span class="skel sm"></span></div></div>
+    <div class="card"><div class="label">관심종목</div><div class="value"><span class="skel sm"></span></div></div>
+  </div>
+  <div class="key-status" id="keys"></div>
+
+  <!-- 보유 자산 -->
+  <div class="panel-head sub"><h3>보유 자산 <span class="muted small">(DB 원본, 시세 미포함)</span></h3></div>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr>
+        <th>ID</th><th>종류</th><th>이름</th><th class="num">수량</th><th class="num">평균 매입가</th>
+        <th class="num">직접 입력 현재가</th><th>메모</th><th>수정일</th><th></th>
+      </tr></thead>
+      <tbody id="holdings"></tbody>
+    </table>
+  </div>
+
+  <!-- 관심종목 -->
+  <div class="panel-head sub"><h3>관심종목</h3></div>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>종목코드</th><th>이름</th><th>등록일</th><th></th></tr></thead>
+      <tbody id="watchlist"></tbody>
+    </table>
+  </div>
+
+</div>
+<script src="/admin/admin.js"></script>
+</body>
+</html>

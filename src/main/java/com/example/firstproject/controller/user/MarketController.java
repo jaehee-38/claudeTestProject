@@ -1,4 +1,4 @@
-package com.example.firstproject.controller;
+package com.example.firstproject.controller.user;
 
 import com.example.firstproject.config.InvestProperties;
 import com.example.firstproject.dto.AptTradeDto;

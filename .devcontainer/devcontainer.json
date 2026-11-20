@@ -1,4 +1,8 @@
 {
   "name": "claudeTestProject",
+  "remoteEnv": {
+    "JAVA_HOME": "/usr/local/sdkman/candidates/java/21.0.13.0+2-ms",
+    "PATH": "/usr/local/sdkman/candidates/java/21.0.13.0+2-ms/bin:${containerEnv:PATH}"
+  },
   "postStartCommand": "bash .devcontainer/generate-env.sh"
 }

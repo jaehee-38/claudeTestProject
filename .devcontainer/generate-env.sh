@@ -20,3 +20,7 @@ KIS_MOCK=${KIS_MOCK:-true}
 EOF
 
 echo ".env generated from Codespace Secrets"
+
+# Java 21 고정 (Gradle 8.8은 Java 25 미지원)
+ln -sfn /usr/local/sdkman/candidates/java/21.0.13.0+2-ms /usr/local/sdkman/candidates/java/current
+echo "JAVA_HOME fixed to Java 21"

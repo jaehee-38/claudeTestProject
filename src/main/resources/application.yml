@@ -24,9 +24,14 @@ spring:
       connection-timeout: 10000
       validation-timeout: 3000
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     show-sql: false
     open-in-view: false
     properties:

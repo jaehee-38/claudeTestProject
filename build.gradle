@@ -33,6 +33,9 @@ dependencies {
     // MySQL Driver (MySQL / MariaDB 호환)
     runtimeOnly 'com.mysql:mysql-connector-j'
 
+    // Flyway (DB 마이그레이션)
+    implementation 'org.flywaydb:flyway-mysql'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

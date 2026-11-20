@@ -25,10 +25,52 @@
   <!-- 개요 -->
   <div class="panel-head"><h2>개요</h2><button class="btn ghost icon" id="reload">새로고침</button></div>
   <div class="cards" id="overview">
+    <div class="card"><div class="label">회원</div><div class="value"><span class="skel sm"></span></div></div>
+    <div class="card"><div class="label">모의투자 계좌</div><div class="value"><span class="skel sm"></span></div></div>
     <div class="card"><div class="label">보유 자산</div><div class="value"><span class="skel sm"></span></div></div>
     <div class="card"><div class="label">관심종목</div><div class="value"><span class="skel sm"></span></div></div>
   </div>
   <div class="key-status" id="keys"></div>
+
+  <!-- 회원 관리 -->
+  <div class="panel-head sub">
+    <h3>회원 관리</h3>
+    <div class="actions">
+      <select id="member-stat-filter">
+        <option value="">전체</option>
+        <option value="NORMAL">정상</option>
+        <option value="LOCKED">잠금</option>
+        <option value="DORMANT">휴면</option>
+        <option value="WITHDRAWN">탈퇴</option>
+      </select>
+      <button class="btn ghost icon" id="member-reload">새로고침</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr>
+        <th>번호</th><th>아이디</th><th>이름</th><th>상태</th>
+        <th class="num">로그인실패</th><th>최종로그인</th><th>가입일</th><th></th>
+      </tr></thead>
+      <tbody id="member-rows"></tbody>
+    </table>
+  </div>
+
+  <!-- 모의투자 계좌 -->
+  <div class="panel-head sub">
+    <h3>모의투자 계좌</h3>
+    <button class="btn ghost icon" id="account-reload">새로고침</button>
+  </div>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr>
+        <th>계좌번호</th><th>회원</th><th>계좌명</th>
+        <th class="num">예수금</th><th class="num">초기금액</th><th class="num">손익</th>
+        <th>상태</th><th>개설일</th>
+      </tr></thead>
+      <tbody id="invest-account-rows"></tbody>
+    </table>
+  </div>
 
   <!-- 보유 자산 -->
   <div class="panel-head sub"><h3>보유 자산 <span class="muted small">(DB 원본, 시세 미포함)</span></h3></div>

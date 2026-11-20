@@ -50,4 +50,11 @@ public class Member {
             this.memberStatCd = "LOCKED";
         }
     }
+
+    public void updateStatus(String statCd) {
+        this.memberStatCd = statCd;
+        if ("NORMAL".equals(statCd)) {
+            this.loginFailCnt = 0;
+        }
+    }
 }

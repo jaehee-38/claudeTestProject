@@ -34,9 +34,16 @@ const KEY_LABELS = {
   dataGoKr: '공공데이터포털', koreaexim: '수출입은행', kis: '한국투자증권', kisAccount: 'KIS 계좌',
 };
 
+const STAT_LABEL = { NORMAL: '정상', LOCKED: '잠금', DORMANT: '휴면', WITHDRAWN: '탈퇴' };
+const STAT_CLS   = { NORMAL: 'on',  LOCKED: 'off',  DORMANT: 'warn', WITHDRAWN: '' };
+const won = (v) => v == null ? '-' : new Intl.NumberFormat('ko-KR').format(v) + '원';
+const signed = (v) => v == null ? '-' : (Number(v) >= 0 ? '+' : '') + new Intl.NumberFormat('ko-KR').format(v) + '원';
+
 async function loadOverview() {
   const o = await api('/overview');
   $('#overview').innerHTML = `
+    <div class="card"><div class="label">회원</div><div class="value">${num(o.memberCount)}명</div></div>
+    <div class="card"><div class="label">모의투자 계좌</div><div class="value">${num(o.investAccountCount)}개</div></div>
     <div class="card"><div class="label">보유 자산</div><div class="value">${num(o.holdingCount)}건</div></div>
     <div class="card"><div class="label">관심종목</div><div class="value">${num(o.watchCount)}<span class="muted small"> / ${o.watchMax}</span></div></div>`;
   const k = o.apiKeys;
@@ -76,16 +83,68 @@ async function loadWatchlist() {
     </tr>`).join('');
 }
 
+async function loadMembers() {
+  const stat = $('#member-stat-filter').value;
+  const tbody = $('#member-rows');
+  tbody.innerHTML = `<tr><td class="empty" colspan="8">불러오는 중…</td></tr>`;
+  const list = await api('/members' + (stat ? `?stat=${stat}` : ''));
+  if (!list.length) return emptyRow(tbody, 8, '회원이 없습니다.');
+  tbody.innerHTML = list.map((m) => `
+    <tr>
+      <td class="muted">${m.memberNo}</td>
+      <td><b>${esc(m.loginId)}</b></td>
+      <td>${esc(m.memberNm || '-')}</td>
+      <td><span class="key ${STAT_CLS[m.memberStatCd] || ''}">${STAT_LABEL[m.memberStatCd] || esc(m.memberStatCd)}</span></td>
+      <td class="num ${m.loginFailCnt >= 3 ? 'down' : ''}">${m.loginFailCnt}</td>
+      <td class="muted">${dt(m.lastLoginDt)}</td>
+      <td class="muted">${dt(m.regDt)}</td>
+      <td>
+        <div class="row-actions">
+          ${m.memberStatCd === 'LOCKED'
+            ? `<button class="btn ghost icon" data-member-unlock="${m.memberNo}">잠금 해제</button>`
+            : m.memberStatCd === 'NORMAL'
+              ? `<button class="btn ghost icon" data-member-lock="${m.memberNo}">잠금</button>`
+              : ''}
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+async function loadInvestAccounts() {
+  const tbody = $('#invest-account-rows');
+  tbody.innerHTML = `<tr><td class="empty" colspan="8">불러오는 중…</td></tr>`;
+  const list = await api('/invest-accounts');
+  if (!list.length) return emptyRow(tbody, 8, '계좌가 없습니다.');
+  tbody.innerHTML = list.map((a) => {
+    const pnl = Number(a.depositAmt) - Number(a.initAmt);
+    return `
+    <tr>
+      <td class="muted">${a.accountNo}</td>
+      <td><b>${esc(a.loginId)}</b><span class="muted small"> #${a.memberNo}</span></td>
+      <td>${esc(a.accountNm)}</td>
+      <td class="num">${won(a.depositAmt)}</td>
+      <td class="num muted">${won(a.initAmt)}</td>
+      <td class="num ${pnl >= 0 ? 'up' : 'down'}">${signed(pnl)}</td>
+      <td><span class="key ${a.accountStatCd === 'ACTIVE' ? 'on' : 'off'}">${esc(a.accountStatCd)}</span></td>
+      <td class="muted">${dt(a.regDt)}</td>
+    </tr>`;
+  }).join('');
+}
+
 async function loadAll() {
   showError(null);
-  const results = await Promise.allSettled([loadOverview(), loadHoldings(), loadWatchlist()]);
+  const results = await Promise.allSettled([
+    loadOverview(), loadMembers(), loadInvestAccounts(), loadHoldings(), loadWatchlist()
+  ]);
   const failed = results.find((r) => r.status === 'rejected');
   if (failed) showError(failed.reason);
 }
 
 document.addEventListener('click', async (e) => {
-  const holding = e.target.closest('[data-del-holding]');
-  const watch = e.target.closest('[data-del-watch]');
+  const holding    = e.target.closest('[data-del-holding]');
+  const watch      = e.target.closest('[data-del-watch]');
+  const lockBtn    = e.target.closest('[data-member-lock]');
+  const unlockBtn  = e.target.closest('[data-member-unlock]');
   try {
     if (holding) {
       if (!confirm(`"${holding.dataset.name}" 자산을 삭제할까요?`)) return;
@@ -95,6 +154,22 @@ document.addEventListener('click', async (e) => {
       if (!confirm(`관심종목 ${watch.dataset.delWatch} 를 삭제할까요?`)) return;
       await api(`/watchlist/${encodeURIComponent(watch.dataset.delWatch)}`, { method: 'DELETE' });
       await loadAll();
+    } else if (lockBtn) {
+      if (!confirm('이 회원을 잠금 처리할까요?')) return;
+      await api(`/members/${lockBtn.dataset.memberLock}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statCd: 'LOCKED' }),
+      });
+      await loadMembers();
+    } else if (unlockBtn) {
+      if (!confirm('이 회원의 잠금을 해제할까요?')) return;
+      await api(`/members/${unlockBtn.dataset.memberUnlock}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statCd: 'NORMAL' }),
+      });
+      await loadMembers();
     }
   } catch (err) {
     showError(err);
@@ -102,4 +177,7 @@ document.addEventListener('click', async (e) => {
 });
 
 $('#reload').addEventListener('click', loadAll);
+$('#member-reload').addEventListener('click', loadMembers);
+$('#member-stat-filter').addEventListener('change', loadMembers);
+$('#account-reload').addEventListener('click', loadInvestAccounts);
 loadAll();

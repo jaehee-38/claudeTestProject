@@ -3,6 +3,8 @@ package com.example.firstproject.controller.admin;
 import com.example.firstproject.config.InvestProperties;
 import com.example.firstproject.dto.HoldingDto;
 import com.example.firstproject.dto.WatchItemDto;
+import com.example.firstproject.repository.InvestAccountRepository;
+import com.example.firstproject.repository.MemberRepository;
 import com.example.firstproject.service.PortfolioService;
 import com.example.firstproject.service.WatchlistService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,8 @@ public class AdminController {
     private final InvestProperties props;
     private final PortfolioService portfolioService;
     private final WatchlistService watchlistService;
+    private final MemberRepository memberRepo;
+    private final InvestAccountRepository investAccountRepo;
 
     // 개요: GET /admin/api/overview
     @GetMapping("/overview")
@@ -40,6 +44,8 @@ public class AdminController {
         result.put("holdingCount", portfolioService.count());
         result.put("watchCount", watchlistService.count());
         result.put("watchMax", WatchlistService.MAX_ITEMS);
+        result.put("memberCount", memberRepo.count());
+        result.put("investAccountCount", investAccountRepo.count());
         result.put("apiKeys", keys);
         return result;
     }

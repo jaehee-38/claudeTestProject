@@ -79,8 +79,4 @@ invest:
     token-cache-file: ${KIS_TOKEN_CACHE_FILE:.kis-token.json}
 
 logging:
-  file:
-    name: logs/app.log
-  pattern:
-    file: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n"
-    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n"
+  config: classpath:logback-spring.xml

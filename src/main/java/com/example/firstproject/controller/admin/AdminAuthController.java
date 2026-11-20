@@ -5,6 +5,8 @@ import com.example.firstproject.config.AdminProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +21,8 @@ import java.security.MessageDigest;
 @Controller
 @RequiredArgsConstructor
 public class AdminAuthController {
+
+    private static final Logger authLog = LoggerFactory.getLogger("auth");
 
     private final AdminProperties props;
 
@@ -36,11 +40,13 @@ public class AdminAuthController {
         boolean userOk = same(username.trim(), props.username());
         boolean passOk = same(password, props.password());
         if (!(props.configured() && userOk & passOk)) {
+            authLog.info("LOGIN_FAIL  ip={} username={}", request.getRemoteAddr(), username.trim());
             return "redirect:/admin/login?error";
         }
         HttpSession session = request.getSession(true);
-        request.changeSessionId(); // 로그인 전 세션 ID 를 그대로 쓰지 않도록 새로 발급
+        request.changeSessionId();
         session.setAttribute(AdminAuthFilter.SESSION_KEY, Boolean.TRUE);
+        authLog.info("LOGIN_OK    ip={} username={}", request.getRemoteAddr(), username.trim());
         return "redirect:/admin/";
     }
 
@@ -49,6 +55,7 @@ public class AdminAuthController {
     public String logout(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         if (session != null) session.invalidate();
+        authLog.info("LOGOUT      ip={}", request.getRemoteAddr());
         return "redirect:/admin/login?logout";
     }
 

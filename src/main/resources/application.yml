@@ -77,3 +77,7 @@ invest:
     base-url: ${KIS_BASE_URL:https://openapivts.koreainvestment.com:29443}
     # 접근토큰은 발급 횟수 제한이 있어서 파일에 저장해 두고 재사용합니다 (.gitignore 등록됨)
     token-cache-file: ${KIS_TOKEN_CACHE_FILE:.kis-token.json}
+
+logging:
+  file:
+    name: logs/app.log

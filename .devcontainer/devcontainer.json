@@ -1,0 +1,4 @@
+{
+  "name": "claudeTestProject",
+  "postStartCommand": "bash .devcontainer/generate-env.sh"
+}

@@ -1004,20 +1004,41 @@ $('#inv-order-form').addEventListener('submit', async (e) => {
 // 보유잔고
 async function loadInvHoldings() {
   const tbody = $('#inv-holding-rows');
-  emptyRow(tbody, 5, '불러오는 중…');
+  emptyRow(tbody, 7, '불러오는 중…');
+  $('#inv-pnl-summary').innerHTML = '';
   try {
     const list = await api(`/api/invest/accounts/${invAccountNo}/holdings`);
-    if (!list.length) { emptyRow(tbody, 5, '보유 종목이 없습니다.'); return; }
+    if (!list.length) { emptyRow(tbody, 7, '보유 종목이 없습니다.'); return; }
+
+    // 합계 계산
+    let totalEval = null, totalPnl = null, totalBuy = BigDecimal_ZERO;
+    list.forEach((h) => {
+      if (h.evalAmt != null) { totalEval = (totalEval ?? 0) + Number(h.evalAmt); }
+      if (h.evalPnl != null) { totalPnl  = (totalPnl  ?? 0) + Number(h.evalPnl); }
+      totalBuy += Number(h.totBuyAmt ?? 0);
+    });
+    const totalRate = (totalPnl != null && totalBuy) ? (totalPnl / totalBuy * 100) : null;
+
+    $('#inv-pnl-summary').innerHTML = `
+      <div class="card"><div class="label">총 매입금액</div><div class="value">${won(totalBuy)}</div></div>
+      ${totalEval != null ? `<div class="card"><div class="label">총 평가금액</div><div class="value">${won(totalEval)}</div></div>` : ''}
+      ${totalPnl  != null ? `<div class="card"><div class="label">총 평가손익</div><div class="value ${totalPnl >= 0 ? 'up' : 'down'}">${signed(totalPnl)}원</div></div>` : ''}
+      ${totalRate != null ? `<div class="card"><div class="label">총 수익률</div><div class="value ${totalRate >= 0 ? 'up' : 'down'}">${pct(totalRate)}</div></div>` : ''}`;
+
     tbody.innerHTML = list.map((h) => `
       <tr>
-        <td>${invAssetName(h.assetNo)}</td>
+        <td>${esc(h.assetNm ?? invAssetName(h.assetNo))}</td>
         <td class="num">${num(h.holdQty, nf4)}</td>
-        <td class="num">${num(h.sellableQty, nf4)}</td>
         <td class="num">${won(h.avgBuyPrc)}</td>
-        <td class="num">${won(h.totBuyAmt)}</td>
+        <td class="num">${h.currentPrice != null ? won(h.currentPrice) : '-'}</td>
+        <td class="num">${h.evalAmt != null ? won(h.evalAmt) : '-'}</td>
+        <td class="num ${h.evalPnl != null ? (Number(h.evalPnl) >= 0 ? 'up' : 'down') : ''}">${h.evalPnl != null ? signed(h.evalPnl) + '원' : '-'}</td>
+        <td class="num ${h.returnRate != null ? (Number(h.returnRate) >= 0 ? 'up' : 'down') : ''}">${h.returnRate != null ? pct(h.returnRate) : '-'}</td>
       </tr>`).join('');
-  } catch (e) { emptyRow(tbody, 5, '불러오지 못했습니다.'); }
+  } catch (e) { emptyRow(tbody, 7, '불러오지 못했습니다.'); }
 }
+
+const BigDecimal_ZERO = 0;
 
 // 주문내역
 async function loadInvOrders() {

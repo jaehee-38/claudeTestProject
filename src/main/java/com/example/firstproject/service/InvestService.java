@@ -113,7 +113,15 @@ public class InvestService {
     @Transactional(readOnly = true)
     public List<InvestHoldingRes> getHoldings(Long accountNo) {
         return holdingRepo.findByIdAccountNo(accountNo).stream()
-                .map(InvestHoldingRes::from).toList();
+                .map(h -> {
+                    Long assetNo = h.getId().getAssetNo();
+                    InvestAsset asset = assetRepo.findById(assetNo).orElse(null);
+                    BigDecimal curPrice = assetRepo.findRealtimePrice(assetNo)
+                            .or(() -> assetRepo.findLatestDailyPrice(assetNo))
+                            .orElse(null);
+                    return InvestHoldingRes.of(h, asset, curPrice);
+                })
+                .toList();
     }
 
     @Transactional(readOnly = true)

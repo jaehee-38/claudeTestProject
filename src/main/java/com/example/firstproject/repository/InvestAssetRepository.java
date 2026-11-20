@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 public interface InvestAssetRepository extends JpaRepository<InvestAsset, Long> {
@@ -15,4 +16,6 @@ public interface InvestAssetRepository extends JpaRepository<InvestAsset, Long> 
 
     @Query(value = "SELECT close_prc FROM TB_ASSET_PRICE_DAILY WHERE asset_no = :assetNo ORDER BY base_de DESC LIMIT 1", nativeQuery = true)
     Optional<BigDecimal> findLatestDailyPrice(@Param("assetNo") Long assetNo);
+
+    List<InvestAsset> findByTradableYnOrderByAssetTypeCdAscAssetNoAsc(String tradableYn);
 }

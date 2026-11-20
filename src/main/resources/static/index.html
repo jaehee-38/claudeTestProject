@@ -24,6 +24,7 @@
     <a class="tab" href="#/gold" data-route="gold">금</a>
     <a class="tab" href="#/exchange" data-route="exchange">환율</a>
     <a class="tab" href="#/realestate" data-route="realestate">부동산</a>
+    <a class="tab" href="#/invest" data-route="invest">모의투자</a>
   </nav>
 
   <main>
@@ -170,8 +171,108 @@
       </div>
     </section>
 
+    <!-- ================= 모의투자 ================= -->
+    <section id="view-invest" class="view" hidden>
+      <div class="panel-head">
+        <h2>모의투자</h2>
+        <button id="inv-new-account-btn" class="btn primary">+ 계좌 개설</button>
+      </div>
+
+      <div class="inv-toolbar">
+        <div class="inv-tg">
+          <span class="inv-label">회원번호</span>
+          <input id="inv-member-no" type="number" value="1" min="1" style="width:70px">
+          <button id="inv-load-btn" class="btn ghost">불러오기</button>
+        </div>
+        <div class="inv-tg">
+          <span class="inv-label">계좌</span>
+          <select id="inv-account-sel"><option value="">계좌 선택</option></select>
+        </div>
+      </div>
+
+      <div id="inv-account-info" class="cards" hidden></div>
+
+      <div id="inv-tabs-wrap" hidden>
+        <div class="sub-tabs">
+          <button class="inv-tab active" data-panel="order">주문하기</button>
+          <button class="inv-tab" data-panel="holdings">보유잔고</button>
+          <button class="inv-tab" data-panel="orders">주문내역</button>
+          <button class="inv-tab" data-panel="ledger">거래원장</button>
+        </div>
+
+        <!-- 주문 -->
+        <div id="inv-panel-order" class="inv-panel">
+          <form id="inv-order-form" class="inv-form">
+            <div class="inv-row">
+              <label>자산<select id="inv-asset"><option value="">선택</option></select></label>
+              <label>현재가<span id="inv-cur-price" class="val-box">-</span></label>
+            </div>
+            <div class="inv-row">
+              <label>구분
+                <span class="side-grp">
+                  <label class="side-opt buy"><input type="radio" name="inv-side" value="BUY" checked>매수</label>
+                  <label class="side-opt sell"><input type="radio" name="inv-side" value="SELL">매도</label>
+                </span>
+              </label>
+              <label>수량<input id="inv-qty" type="number" step="any" min="0" placeholder="0" style="width:120px"></label>
+            </div>
+            <div class="inv-row">
+              <label>예상금액<span id="inv-est-amt" class="val-box">-</span></label>
+            </div>
+            <p id="inv-order-msg" class="msg" hidden></p>
+            <button type="submit" class="btn primary">주문 실행</button>
+          </form>
+        </div>
+
+        <!-- 보유잔고 -->
+        <div id="inv-panel-holdings" class="inv-panel" hidden>
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th>자산</th><th class="num">보유수량</th><th class="num">매도가능</th><th class="num">평균매입가</th><th class="num">총매입금액</th></tr></thead>
+              <tbody id="inv-holding-rows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 주문내역 -->
+        <div id="inv-panel-orders" class="inv-panel" hidden>
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th class="num">주문번호</th><th>자산</th><th>구분</th><th class="num">수량</th><th class="num">가격</th><th>상태</th><th>일시</th></tr></thead>
+              <tbody id="inv-order-rows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 거래원장 -->
+        <div id="inv-panel-ledger" class="inv-panel" hidden>
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th>유형</th><th class="num">금액</th><th class="num">잔액</th><th>비고</th><th>일시</th></tr></thead>
+              <tbody id="inv-ledger-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
+
+<!-- 계좌 개설 -->
+<dialog id="inv-acct-dialog">
+  <form id="inv-acct-form" method="dialog">
+    <h3>계좌 개설</h3>
+    <label>회원번호<input id="inv-acct-member" type="number" min="1" required></label>
+    <label>계좌명<input id="inv-acct-name" required maxlength="50" value="모의투자 계좌"></label>
+    <label>초기금액(원)<input id="inv-acct-amt" type="number" min="1" required value="10000000"></label>
+    <p id="inv-acct-err" class="error small" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" id="inv-acct-cancel" class="btn ghost">취소</button>
+      <button type="submit" class="btn primary">개설</button>
+    </div>
+  </form>
+</dialog>
 
 <!-- 자산 추가/수정 -->
 <dialog id="holding-dialog">

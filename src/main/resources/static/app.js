@@ -110,6 +110,7 @@ const views = {
   gold: renderGoldView,
   exchange: renderExchangeView,
   realestate: renderRealEstateView,
+  invest: renderInvestView,
 };
 
 function route() {
@@ -884,6 +885,214 @@ function drawRealEstate() {
       <td class="num">${t.buildYear ?? '-'}</td>
     </tr>`).join('');
 }
+
+// =====================================================================
+// 모의투자
+// =====================================================================
+
+let invAssets = [];
+let invAccountNo = null;
+
+function renderInvestView() {
+  if (!invAssets.length) loadInvAssets();
+}
+
+async function loadInvAssets() {
+  try {
+    invAssets = await api('/api/invest/assets');
+    const sel = $('#inv-asset');
+    sel.innerHTML = '<option value="">자산 선택</option>' +
+      invAssets.map((a) => `<option value="${a.assetNo}" data-price="${a.currentPrice ?? ''}">${esc(a.assetNm)} (${esc(a.assetCd || a.assetTypeCd)})</option>`).join('');
+  } catch (e) { /* 자산 로드 실패 무시 */ }
+}
+
+$('#inv-load-btn').addEventListener('click', loadInvAccounts);
+
+async function loadInvAccounts() {
+  const memberNo = $('#inv-member-no').value;
+  try {
+    const list = await api(`/api/invest/accounts?memberNo=${memberNo}`);
+    const sel = $('#inv-account-sel');
+    sel.innerHTML = '<option value="">계좌 선택</option>' +
+      list.map((a) => `<option value="${a.accountNo}">${esc(a.accountNm)} (${won(a.depositAmt)})</option>`).join('');
+    if (list.length) {
+      sel.value = list[0].accountNo;
+      invAccountNo = list[0].accountNo;
+      refreshInvAccount();
+      $('#inv-tabs-wrap').hidden = false;
+    }
+  } catch (e) { alert('계좌 불러오기 실패: ' + e.message); }
+}
+
+$('#inv-account-sel').addEventListener('change', () => {
+  invAccountNo = $('#inv-account-sel').value || null;
+  if (invAccountNo) { refreshInvAccount(); $('#inv-tabs-wrap').hidden = false; }
+  else { $('#inv-account-info').hidden = true; $('#inv-tabs-wrap').hidden = true; }
+});
+
+async function refreshInvAccount() {
+  if (!invAccountNo) return;
+  try {
+    const a = await api(`/api/invest/accounts/${invAccountNo}`);
+    const diff = Number(a.depositAmt) - Number(a.initAmt);
+    $('#inv-account-info').innerHTML = `
+      <div class="card"><div class="label">예수금</div><div class="value">${won(a.depositAmt)}</div></div>
+      <div class="card"><div class="label">초기금액</div><div class="value muted">${won(a.initAmt)}</div></div>
+      <div class="card"><div class="label">손익</div><div class="value ${diff >= 0 ? 'up' : 'down'}">${signed(diff)}원</div></div>
+      <div class="card"><div class="label">상태</div><div class="value">${esc(a.accountStatCd)}</div></div>`;
+    $('#inv-account-info').hidden = false;
+  } catch (e) { /* 무시 */ }
+}
+
+// 서브 탭
+document.querySelectorAll('.inv-tab').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.inv-tab').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.inv-panel').forEach((p) => { p.hidden = true; });
+    btn.classList.add('active');
+    const panel = btn.dataset.panel;
+    $(`#inv-panel-${panel}`).hidden = false;
+    if (panel === 'holdings') loadInvHoldings();
+    else if (panel === 'orders') loadInvOrders();
+    else if (panel === 'ledger') loadInvLedger();
+  });
+});
+
+// 자산 선택 → 현재가/예상금액 갱신
+function updateInvEstimate() {
+  const opt = $('#inv-asset').options[$('#inv-asset').selectedIndex];
+  const price = opt ? Number(opt.dataset.price) || 0 : 0;
+  const qty = Number($('#inv-qty').value) || 0;
+  const side = document.querySelector('[name="inv-side"]:checked')?.value;
+  $('#inv-cur-price').textContent = price ? won(price) : '-';
+  if (price && qty) {
+    const amt = Math.floor(price * qty);
+    const fee = Math.ceil(amt * 0.0005);
+    const tax = side === 'SELL' ? Math.ceil(amt * 0.002) : 0;
+    const net = side === 'BUY' ? amt + fee : amt - fee - tax;
+    $('#inv-est-amt').textContent = `${won(net)} (수수료 ${won(fee)}${tax ? ' · 세금 ' + won(tax) : ''})`;
+  } else {
+    $('#inv-est-amt').textContent = '-';
+  }
+}
+$('#inv-asset').addEventListener('change', updateInvEstimate);
+$('#inv-qty').addEventListener('input', updateInvEstimate);
+document.querySelectorAll('[name="inv-side"]').forEach((r) => r.addEventListener('change', updateInvEstimate));
+
+// 주문 실행
+$('#inv-order-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!invAccountNo) return;
+  const assetNo = Number($('#inv-asset').value);
+  const side = document.querySelector('[name="inv-side"]:checked')?.value;
+  const qty = Number($('#inv-qty').value);
+  if (!assetNo || !side || !qty) return;
+  showMsg($('#inv-order-msg'), '');
+  try {
+    const o = await api(`/api/invest/accounts/${invAccountNo}/orders`, {
+      method: 'POST',
+      body: JSON.stringify({ assetNo, side, qty }),
+    });
+    showMsg($('#inv-order-msg'),
+      `✓ ${o.orderSideCd === 'BUY' ? '매수' : '매도'} 주문 완료 (주문번호: ${o.orderNo}, ${o.orderStatCd})`, 'info');
+    $('#inv-qty').value = '';
+    updateInvEstimate();
+    refreshInvAccount();
+  } catch (e) { showMsg($('#inv-order-msg'), e.message); }
+});
+
+// 보유잔고
+async function loadInvHoldings() {
+  const tbody = $('#inv-holding-rows');
+  emptyRow(tbody, 5, '불러오는 중…');
+  try {
+    const list = await api(`/api/invest/accounts/${invAccountNo}/holdings`);
+    if (!list.length) { emptyRow(tbody, 5, '보유 종목이 없습니다.'); return; }
+    tbody.innerHTML = list.map((h) => `
+      <tr>
+        <td>${invAssetName(h.assetNo)}</td>
+        <td class="num">${num(h.holdQty, nf4)}</td>
+        <td class="num">${num(h.sellableQty, nf4)}</td>
+        <td class="num">${won(h.avgBuyPrc)}</td>
+        <td class="num">${won(h.totBuyAmt)}</td>
+      </tr>`).join('');
+  } catch (e) { emptyRow(tbody, 5, '불러오지 못했습니다.'); }
+}
+
+// 주문내역
+async function loadInvOrders() {
+  const tbody = $('#inv-order-rows');
+  emptyRow(tbody, 7, '불러오는 중…');
+  try {
+    const list = await api(`/api/invest/accounts/${invAccountNo}/orders`);
+    if (!list.length) { emptyRow(tbody, 7, '주문 내역이 없습니다.'); return; }
+    tbody.innerHTML = list.map((o) => `
+      <tr>
+        <td class="num muted">${o.orderNo}</td>
+        <td>${invAssetName(o.assetNo)}</td>
+        <td class="${o.orderSideCd === 'BUY' ? 'up' : 'down'}">${o.orderSideCd === 'BUY' ? '매수' : '매도'}</td>
+        <td class="num">${num(o.orderQty, nf4)}</td>
+        <td class="num">${won(o.orderPrc)}</td>
+        <td>${esc(o.orderStatCd)}</td>
+        <td class="muted small">${invFmtDt(o.orderDt)}</td>
+      </tr>`).join('');
+  } catch (e) { emptyRow(tbody, 7, '불러오지 못했습니다.'); }
+}
+
+// 거래원장
+async function loadInvLedger() {
+  const tbody = $('#inv-ledger-rows');
+  emptyRow(tbody, 5, '불러오는 중…');
+  try {
+    const list = await api(`/api/invest/accounts/${invAccountNo}/ledger`);
+    if (!list.length) { emptyRow(tbody, 5, '거래 내역이 없습니다.'); return; }
+    tbody.innerHTML = list.map((l) => `
+      <tr>
+        <td>${esc(l.txnTypeCd)}</td>
+        <td class="num ${Number(l.txnAmt) >= 0 ? 'up' : 'down'}">${signed(l.txnAmt)}원</td>
+        <td class="num">${won(l.balanceAfter)}</td>
+        <td class="muted small">${esc(l.remark || '')}</td>
+        <td class="muted small">${invFmtDt(l.regDt)}</td>
+      </tr>`).join('');
+  } catch (e) { emptyRow(tbody, 5, '불러오지 못했습니다.'); }
+}
+
+function invAssetName(assetNo) {
+  const a = invAssets.find((x) => x.assetNo === assetNo);
+  return a ? esc(a.assetNm) : `#${assetNo}`;
+}
+
+function invFmtDt(dt) {
+  return dt ? String(dt).replace('T', ' ').substring(0, 16) : '-';
+}
+
+// 계좌 개설 다이얼로그
+$('#inv-new-account-btn').addEventListener('click', () => {
+  $('#inv-acct-member').value = $('#inv-member-no').value || 1;
+  $('#inv-acct-err').hidden = true;
+  $('#inv-acct-dialog').showModal();
+});
+$('#inv-acct-cancel').addEventListener('click', () => $('#inv-acct-dialog').close());
+$('#inv-acct-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const memberNo = Number($('#inv-acct-member').value);
+  const accountNm = $('#inv-acct-name').value.trim();
+  const initAmt = Number($('#inv-acct-amt').value);
+  try {
+    await api('/api/invest/accounts', {
+      method: 'POST',
+      body: JSON.stringify({ memberNo, accountNm, initAmt }),
+    });
+    $('#inv-acct-dialog').close();
+    $('#inv-member-no').value = memberNo;
+    loadInvAccounts();
+  } catch (e) {
+    const err = $('#inv-acct-err');
+    err.textContent = e.message;
+    err.hidden = false;
+    e.preventDefault(); // dialog가 닫히지 않게
+  }
+});
 
 // =====================================================================
 // 시작

@@ -3,6 +3,7 @@ package com.example.firstproject.service;
 import com.example.firstproject.common.ApiException;
 import com.example.firstproject.dto.*;
 import com.example.firstproject.entity.*;
+import com.example.firstproject.dto.InvestAssetRes;
 import com.example.firstproject.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,6 +28,18 @@ public class InvestService {
     private final InvestExecutionRepository execRepo;
     private final InvestHoldingRepository holdingRepo;
     private final AccountLedgerRepository ledgerRepo;
+
+    // ── 자산 목록 ─────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<InvestAssetRes> getTradableAssets() {
+        return assetRepo.findByTradableYnOrderByAssetTypeCdAscAssetNoAsc("Y").stream()
+                .map(a -> InvestAssetRes.of(a,
+                        assetRepo.findRealtimePrice(a.getAssetNo())
+                                .or(() -> assetRepo.findLatestDailyPrice(a.getAssetNo()))
+                                .orElse(null)))
+                .toList();
+    }
 
     // ── 계좌 개설 ─────────────────────────────────────────────────────────────
 

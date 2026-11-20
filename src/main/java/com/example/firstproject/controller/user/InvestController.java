@@ -2,6 +2,7 @@ package com.example.firstproject.controller.user;
 
 import com.example.firstproject.dto.*;
 import com.example.firstproject.service.InvestService;
+import com.example.firstproject.dto.InvestAssetRes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +15,12 @@ import java.util.List;
 public class InvestController {
 
     private final InvestService investService;
+
+    // GET /api/invest/assets
+    @GetMapping("/assets")
+    public List<InvestAssetRes> getAssets() {
+        return investService.getTradableAssets();
+    }
 
     // POST /api/invest/accounts
     @PostMapping("/accounts")

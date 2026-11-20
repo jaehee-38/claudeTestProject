@@ -43,7 +43,10 @@
       "PowerShell($env:JAVA_HOME = [System.Environment]::GetEnvironmentVariable\\(\"JAVA_HOME\",\"User\"\\); echo \"using: $env:JAVA_HOME\"; .\\\\gradlew.bat build -x test)",
       "PowerShell($javaHome = [System.Environment]::GetEnvironmentVariable\\(\"JAVA_HOME\",\"User\"\\); Write-Host \"User JAVA_HOME registry value: [$javaHome]\")",
       "PowerShell(winget search *)",
-      "PowerShell(winget install *)"
+      "PowerShell(winget install *)",
+      "Bash(chmod +x /workspaces/claudeTestProject/.devcontainer/generate-env.sh)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)"
     ]
   }
 }

@@ -4,6 +4,7 @@ import com.example.firstproject.common.ApiException;
 import com.example.firstproject.common.Nums;
 import com.example.firstproject.common.TtlCache;
 import com.example.firstproject.config.InvestProperties;
+import com.example.firstproject.dto.GoldHistoryDto;
 import com.example.firstproject.dto.GoldPriceDto;
 import com.example.firstproject.service.external.DataGoKr;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -18,9 +19,12 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -39,6 +43,13 @@ public class GoldService {
 
     // 하루 단위 데이터라 30분 캐시면 충분합니다.
     private final TtlCache<Integer, List<GoldPriceDto>> cache = new TtlCache<>(Duration.ofMinutes(30));
+    private final TtlCache<String, GoldHistoryDto> historyCache = new TtlCache<>(Duration.ofHours(1));
+
+    /** 이 API 는 2020-01-02 부터 데이터가 있습니다 */
+    static final LocalDate FIRST_AVAILABLE = LocalDate.of(2020, 1, 2);
+    /** 그래프 한 줄당 최대 점 개수 */
+    static final int MAX_POINTS = 500;
+    private static final int MAX_DAYS = 3660 + 7;
 
     /** 최근 days 일 동안의 시세, 최신순. 데이터는 다음 영업일에 올라오므로 오늘 값은 보통 없습니다. */
     public List<GoldPriceDto> recent(int days) {
@@ -51,6 +62,97 @@ public class GoldService {
         return recent(14).stream()
                 .filter(p -> p.itemName() != null && p.itemName().toLowerCase().contains(MAIN_ITEM_KEYWORD))
                 .findFirst();
+    }
+
+    /**
+     * 그래프용 기간 시세. 금 1kg 종목만 씁니다 (2022-05 에 종목명이 "금 99.99K" → "금 99.99_1Kg" 로 바뀌었지만
+     * 같은 종목이라 이어서 그립니다. 미니금 100g 은 같은 시세라 뺍니다).
+     *
+     * @param from 시작일 yyyy-MM-dd
+     * @param to   종료일 yyyy-MM-dd (비우면 오늘)
+     */
+    public GoldHistoryDto history(String from, String to) {
+        LocalDate today = LocalDate.now(SEOUL);
+        LocalDate end = to == null || to.isBlank() ? today : parseDate(to, "종료일");
+        LocalDate start = parseDate(from, "시작일");
+        if (end.isAfter(today)) end = today;
+        if (!start.isBefore(end)) throw ApiException.badRequest("시작일은 종료일보다 앞이어야 합니다.");
+        if (start.isBefore(end.minusDays(MAX_DAYS))) throw ApiException.badRequest("최대 10년까지 조회할 수 있습니다.");
+        LocalDate s = start.isBefore(FIRST_AVAILABLE) ? FIRST_AVAILABLE : start, e = end;
+        return historyCache.get(s + ".." + e, () -> fetchHistory(s, e));
+    }
+
+    private GoldHistoryDto fetchHistory(LocalDate start, LocalDate end) {
+        List<GoldPriceDto> rows = new ArrayList<>();
+        for (int page = 1; page <= 10; page++) { // 10년치도 약 3,400건이라 4번이면 끝납니다
+            JsonNode root = request(start, end, page, 1000);
+            JsonNode items = root.path("response").path("body").path("items").path("item");
+            int before = rows.size();
+            if (items.isArray()) items.forEach(i -> rows.add(toDto(i)));
+            else if (items.isObject()) rows.add(toDto(items));
+            int total = root.path("response").path("body").path("totalCount").asInt(0);
+            if (rows.size() == before || rows.size() >= total) break;
+        }
+        return toHistory(rows);
+    }
+
+    static GoldHistoryDto toHistory(List<GoldPriceDto> rows) {
+        // 날짜별로 금 1kg 종목 하나만 (미니금 제외)
+        Map<String, GoldPriceDto> byDate = new LinkedHashMap<>();
+        rows.stream()
+                .filter(r -> r.itemName() != null && r.itemName().startsWith("금 ") && r.close() != null)
+                .sorted(Comparator.comparing(GoldPriceDto::baseDate))
+                .forEach(r -> byDate.putIfAbsent(r.baseDate(), r));
+        List<GoldPriceDto> all = new ArrayList<>(byDate.values());
+
+        List<String> dates = new ArrayList<>();
+        List<Long> close = new ArrayList<>();
+        List<Long> change = new ArrayList<>();
+        for (int i : FxHistoryService.sampleIndexes(all.size(), MAX_POINTS)) {
+            GoldPriceDto r = all.get(i);
+            String d = r.baseDate();
+            dates.add(d.length() == 8 ? d.substring(0, 4) + "-" + d.substring(4, 6) + "-" + d.substring(6) : d);
+            close.add(r.close().longValue());
+            change.add(r.change() == null ? null : r.change().longValue());
+        }
+        return new GoldHistoryDto(
+                dates.isEmpty() ? null : dates.get(0),
+                dates.isEmpty() ? null : dates.get(dates.size() - 1),
+                FIRST_AVAILABLE.toString(), dates, close, change);
+    }
+
+    private JsonNode request(LocalDate begin, LocalDate end, int page, int size) {
+        InvestProperties.DataGoKr cfg = props.dataGoKr();
+        if (!cfg.configured()) {
+            throw ApiException.notConfigured("공공데이터포털(금 시세)", "DATA_GO_KR_SERVICE_KEY");
+        }
+        URI uri = UriComponentsBuilder.fromHttpUrl(cfg.goldUrl())
+                .queryParam("serviceKey", DataGoKr.encodeKey(cfg.serviceKey()))
+                .queryParam("resultType", "json")
+                .queryParam("numOfRows", size)
+                .queryParam("pageNo", page)
+                .queryParam("beginBasDt", begin.format(YMD))
+                .queryParam("endBasDt", end.format(YMD))
+                .build(true)
+                .toUri();
+        String body = restClient.get().uri(uri).retrieve()
+                .onStatus(st -> true, (req, res) -> {})
+                .body(String.class);
+        JsonNode root = parseJson(body);
+        JsonNode header = root.path("response").path("header");
+        String code = header.path("resultCode").asText();
+        if (!code.equals("00")) {
+            throw ApiException.upstream("금 시세", header.path("resultMsg").asText("resultCode=" + code));
+        }
+        return root;
+    }
+
+    private static LocalDate parseDate(String s, String what) {
+        try {
+            return LocalDate.parse(s == null ? "" : s.trim());
+        } catch (DateTimeParseException e) {
+            throw ApiException.badRequest(what + "은 yyyy-MM-dd 형식이어야 합니다.");
+        }
     }
 
     private List<GoldPriceDto> fetch(int days) {
@@ -103,7 +205,7 @@ public class GoldService {
         }
     }
 
-    private GoldPriceDto toDto(JsonNode i) {
+    private static GoldPriceDto toDto(JsonNode i) {
         return new GoldPriceDto(
                 i.path("basDt").asText(),
                 i.path("srtnCd").asText(null),

@@ -720,6 +720,7 @@ $('#watch-refresh').addEventListener('click', () => { invalidate('quote:', 'watc
 // =====================================================================
 
 async function renderGoldView() {
+  loadGoldChart();
   const tbody = $('#gold-rows');
   emptyRow(tbody, 7, '불러오는 중…');
   showMsg($('#gold-msg'), '');
@@ -756,7 +757,7 @@ async function renderGoldView() {
   }
 }
 
-$('#gold-refresh').addEventListener('click', () => { invalidate('gold'); renderGoldView(); });
+$('#gold-refresh').addEventListener('click', () => { invalidate('gold', 'gh:'); renderGoldView(); });
 
 // =====================================================================
 // 환율 (상세)
@@ -1140,6 +1141,195 @@ let fxcResizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(fxcResizeTimer);
   fxcResizeTimer = setTimeout(() => { if (!$('#view-exchange').hidden) drawFxChart(); }, 150);
+});
+
+// ---------------------------------------------------------------------
+// 금 시세 그래프 (금 1kg 종목, 원/g) — 환율 그래프와 같은 기간 버튼/눈금 계산을 씁니다
+// ---------------------------------------------------------------------
+
+/** 기간 버튼 값 → {from, to}. custom 이면 날짜 입력칸 값 */
+function periodFor(range, fromSel, toSel) {
+  if (range === 'custom') return { from: $(fromSel).value, to: $(toSel).value };
+  const d = new Date();
+  (FXC_RANGES[range] || FXC_RANGES['3m'])(d);
+  return { from: isoDate(d), to: isoDate(new Date()) };
+}
+
+/** 12345 → "1.2만", 152300 → "15.2만" (세로축이 좁아서) */
+const shortWon = (v) => (Math.abs(v) >= 10000 ? `${nf2.format(+(v / 10000).toFixed(2))}만` : nf0.format(v));
+
+const gc = { range: store.get('gcRange', '3m'), data: null, geom: null };
+
+data.goldHistory = (from, to) => cached(`gh:${from}:${to}`,
+  () => api(`/api/gold/history?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`), 10 * 60_000);
+
+function gcSyncControls() {
+  document.querySelectorAll('#gc-ranges button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.range === gc.range);
+    b.setAttribute('aria-pressed', b.dataset.range === gc.range);
+  });
+  $('#gc-custom').hidden = gc.range !== 'custom';
+}
+
+async function loadGoldChart() {
+  gcSyncControls();
+  const { from, to } = periodFor(gc.range, '#gc-from', '#gc-to');
+  if (!from || !to) return;
+  showMsg($('#gc-msg'), '');
+  $('#gc-wrap').classList.add('loading');
+  try {
+    gc.data = await data.goldHistory(from, to);
+    if (gc.data.dates.length < 2) {
+      gc.data = null;
+      $('#gc-svg').innerHTML = '';
+      $('#gc-note').hidden = true;
+      showMsg($('#gc-msg'), '이 기간에는 시세가 2일 미만이라 그래프를 그릴 수 없습니다. 기간을 넓혀 주세요.', 'info');
+      return;
+    }
+    $('#gc-title').title = `${gc.data.start} ~ ${gc.data.end} · KRX 금시장 금 99.99_1Kg 종가 · 영업일 다음 날 갱신`;
+    // 요청한 기간이 데이터 시작일보다 앞일 때만 짧게 안내
+    const cut = from < gc.data.firstAvailable;
+    $('#gc-note').hidden = !cut;
+    $('#gc-note').textContent = cut ? `금 시세는 ${gc.data.firstAvailable.slice(0, 4)}년 ${+gc.data.firstAvailable.slice(5, 7)}월부터 있어서 그때부터 보여줍니다.` : '';
+    drawGoldChart();
+  } catch (e) {
+    gc.data = null;
+    $('#gc-svg').innerHTML = '';
+    showMsg($('#gc-msg'), e.message);
+  } finally {
+    $('#gc-wrap').classList.remove('loading');
+  }
+}
+
+function drawGoldChart() {
+  if (!gc.data) return;
+  const svg = $('#gc-svg');
+  const W = $('#gc-wrap').clientWidth || 800;
+  const narrow = W < 560;
+  const H = narrow ? 260 : 320;
+  const M = { l: 52, r: narrow ? 70 : 84, t: 14, b: 30 };
+  const pw = W - M.l - M.r, ph = H - M.t - M.b;
+  const { dates, close } = gc.data;
+  const n = dates.length;
+
+  const lo = Math.min(...close), hi = Math.max(...close);
+  const pad = (hi - lo) * 0.1 || hi * 0.01 || 1;
+  const { ticks } = niceTicks(lo - pad, hi + pad);
+  const y0 = Math.min(ticks[0], lo - pad), y1 = Math.max(ticks[ticks.length - 1], hi + pad);
+  const x = (i) => M.l + (i / (n - 1)) * pw;
+  const y = (v) => M.t + (1 - (v - y0) / (y1 - y0)) * ph;
+
+  const grid = ticks.map((t) => `
+    <line class="fxc-grid" x1="${M.l}" x2="${M.l + pw}" y1="${y(t)}" y2="${y(t)}"/>
+    <text class="fxc-axis" x="${M.l - 8}" y="${y(t)}" text-anchor="end" dominant-baseline="middle">${shortWon(t)}</text>`).join('');
+
+  const long = (new Date(dates[n - 1]) - new Date(dates[0])) / 864e5 > 400;
+  const fmtX = (d) => (long ? `${d.slice(2, 4)}.${d.slice(5, 7)}` : `${d.slice(5, 7)}.${d.slice(8, 10)}`);
+  const xCount = narrow ? 4 : 6;
+  const xIdx = [...new Set(Array.from({ length: xCount }, (_, k) => Math.round((k / (xCount - 1)) * (n - 1))))];
+  const xAxis = xIdx.map((i, k) => `
+    <text class="fxc-axis" x="${x(i)}" y="${H - 8}" text-anchor="${k === 0 ? 'start' : k === xIdx.length - 1 ? 'end' : 'middle'}">${fmtX(dates[i])}</text>`).join('');
+
+  const line = close.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  const area = `${line}L${x(n - 1).toFixed(1)},${M.t + ph}L${x(0).toFixed(1)},${M.t + ph}Z`;
+  const last = close[n - 1];
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+  svg.innerHTML = `
+    <defs><linearGradient id="gc-fill" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="var(--s1)" stop-opacity=".18"/><stop offset="1" stop-color="var(--s1)" stop-opacity="0"/>
+    </linearGradient></defs>
+    <g>${grid}</g>${xAxis}
+    <path d="${area}" fill="url(#gc-fill)" stroke="none"/>
+    <path id="gc-line" class="fxc-line" d="${line}" stroke="var(--s1)"/>
+    <circle cx="${x(n - 1)}" cy="${y(last)}" r="3" fill="var(--s1)"/>
+    <text class="fxc-endtxt" x="${M.l + pw + 8}" y="${y(last)}" dominant-baseline="middle">${nf0.format(last)}</text>
+    <line id="gc-cross" class="fxc-cross" y1="${M.t}" y2="${M.t + ph}" visibility="hidden"/>
+    <circle id="gc-dot" class="gc-dot" r="5" fill="var(--s1)" visibility="hidden"/>`;
+  gc.geom = { M, pw, n, x, y };
+}
+
+function gcHideTip() {
+  $('#gc-tip').hidden = true;
+  $('#gc-cross')?.setAttribute('visibility', 'hidden');
+  $('#gc-dot')?.setAttribute('visibility', 'hidden');
+  $('#gc-line')?.classList.remove('on');
+}
+
+function gcOnMove(ev) {
+  const g = gc.geom;
+  if (!g || !gc.data) return;
+  const svg = $('#gc-svg');
+  const r = svg.getBoundingClientRect();
+  const sx = svg.viewBox.baseVal.width / r.width, sy = svg.viewBox.baseVal.height / r.height;
+  const mx = (ev.clientX - r.left) * sx;
+  const i = Math.max(0, Math.min(g.n - 1, Math.round(((mx - g.M.l) / g.pw) * (g.n - 1))));
+  const { dates, close, change } = gc.data;
+  const v = close[i], cx = g.x(i), cy = g.y(v);
+
+  $('#gc-line').classList.add('on');
+  const cross = $('#gc-cross');
+  cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.setAttribute('visibility', 'visible');
+  const dot = $('#gc-dot');
+  dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('visibility', 'visible');
+
+  const diff = v - close[0];
+  const diffPct = close[0] ? (diff / close[0]) * 100 : null;
+  const tip = $('#gc-tip');
+  tip.innerHTML = `
+    <div class="muted small">${esc(dates[i])}</div>
+    <div class="fxc-tip-big">${nf0.format(v)}원 <span class="muted small">/ g</span></div>
+    <table>
+      <tr><td>한 돈(3.75g)</td><td>${won(Math.round(v * 3.75))}</td></tr>
+      ${change[i] != null ? `<tr><td>전일 대비</td><td class="${signCls(change[i])}">${signed(change[i])}원</td></tr>` : ''}
+      <tr><td>기간 시작 대비</td><td class="${signCls(diff)}">${signed(diff)}원 (${pct(diffPct)})</td></tr>
+    </table>`;
+  tip.hidden = false;
+
+  const wrap = $('#gc-wrap').getBoundingClientRect();
+  const px = cx / sx + (r.left - wrap.left), py = cy / sy + (r.top - wrap.top);
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  let left = px + 14;
+  if (left + tw > wrap.width) left = px - tw - 14;
+  tip.style.left = `${Math.max(0, left)}px`;
+  tip.style.top = `${Math.max(0, Math.min(wrap.height - th, py - th / 2))}px`;
+}
+
+$('#gc-wrap').addEventListener('pointermove', (e) => { if (e.target.closest('#gc-svg')) gcOnMove(e); });
+$('#gc-wrap').addEventListener('pointerleave', gcHideTip);
+
+$('#gc-ranges').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-range]');
+  if (!b) return;
+  gc.range = b.dataset.range;
+  store.set('gcRange', gc.range);
+  if (gc.range === 'custom') {
+    if (!$('#gc-from').value && gc.data) { $('#gc-from').value = gc.data.start; $('#gc-to').value = gc.data.end; }
+    gcSyncControls();
+    return;
+  }
+  loadGoldChart();
+});
+
+$('#gc-custom').addEventListener('submit', (e) => {
+  e.preventDefault();
+  store.set('gcFrom', $('#gc-from').value);
+  store.set('gcTo', $('#gc-to').value);
+  loadGoldChart();
+});
+
+(function initGoldChart() {
+  const today = isoDate(new Date());
+  ['#gc-from', '#gc-to'].forEach((s) => { $(s).max = today; $(s).min = '2020-01-02'; });
+  $('#gc-from').value = store.get('gcFrom', '');
+  $('#gc-to').value = store.get('gcTo', '') || today;
+})();
+
+window.addEventListener('resize', () => {
+  clearTimeout(gc.resizeTimer);
+  gc.resizeTimer = setTimeout(() => { if (!$('#view-gold').hidden) drawGoldChart(); }, 150);
 });
 
 

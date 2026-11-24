@@ -4,6 +4,7 @@ import com.example.firstproject.config.InvestProperties;
 import com.example.firstproject.dto.AptTradeDto;
 import com.example.firstproject.dto.ExchangeRateDto;
 import com.example.firstproject.dto.FxHistoryDto;
+import com.example.firstproject.dto.GoldHistoryDto;
 import com.example.firstproject.dto.GoldPriceDto;
 import com.example.firstproject.dto.KisBalanceDto;
 import com.example.firstproject.dto.StockQuoteDto;
@@ -54,6 +55,12 @@ public class MarketController {
     @GetMapping("/gold")
     public List<GoldPriceDto> gold(@RequestParam(defaultValue = "30") int days) {
         return goldService.recent(days);
+    }
+
+    // GET /api/gold/history?from=2026-08-24&to=2026-11-24  (금 1kg 종목, 그래프용)
+    @GetMapping("/gold/history")
+    public GoldHistoryDto goldHistory(@RequestParam String from, @RequestParam(required = false) String to) {
+        return goldService.history(from, to);
     }
 
     // GET /api/exchange

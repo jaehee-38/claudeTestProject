@@ -3,6 +3,7 @@ package com.example.firstproject.service;
 import com.example.firstproject.common.ApiException;
 import com.example.firstproject.common.TtlCache;
 import com.example.firstproject.config.InvestProperties;
+import com.example.firstproject.dto.NewsArticleDto;
 import com.example.firstproject.dto.NewsItemDto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * 홈 화면 "투자 이슈" 뉴스.
@@ -65,6 +67,10 @@ public class NewsService {
     private final ObjectMapper objectMapper;
 
     private final TtlCache<String, List<NewsItemDto>> cache = new TtlCache<>(Duration.ofMinutes(30));
+    private final TtlCache<String, NewsArticleDto> articleCache = new TtlCache<>(Duration.ofMinutes(30));
+
+    /** 본문을 가져와도 되는 주소는 네이버 뉴스 기사 페이지뿐 (다른 주소로 서버가 요청을 보내지 않도록) */
+    static final Pattern NAVER_ARTICLE = Pattern.compile("^https://n\\.news\\.naver\\.com/mnews/article/\\d{3}/\\d{10}(\\?sid=\\d{3})?$");
 
     public List<NewsItemDto> news(String source, String period, String topic) {
         Source s = parse(Source.class, source, "source 는 naver 또는 google 입니다.");
@@ -155,9 +161,39 @@ public class NewsService {
                     clean(n.path("description").asText()),
                     host(original.isBlank() ? link : original),
                     original.isBlank() ? link : original,
-                    rfc1123(n.path("pubDate").asText(null))));
+                    rfc1123(n.path("pubDate").asText(null)))
+                    .withReaderUrl(NAVER_ARTICLE.matcher(link).matches() ? link : null));
         }
         return out;
+    }
+
+    // ------------------------------------------------------------------ 본문 보기
+
+    public NewsArticleDto article(String url) {
+        String u = url == null ? "" : url.trim();
+        if (!NAVER_ARTICLE.matcher(u).matches()) {
+            throw ApiException.badRequest("사이트 안에서는 네이버 뉴스 기사만 볼 수 있습니다.");
+        }
+        return articleCache.get(u, () -> fetchArticle(u));
+    }
+
+    private NewsArticleDto fetchArticle(String url) {
+        String html;
+        try {
+            html = restClient.get().uri(URI.create(url))
+                    .header("User-Agent", "Mozilla/5.0 (compatible; personal-feed-reader)")
+                    .retrieve()
+                    .body(String.class);
+        } catch (Exception e) {
+            throw ApiException.upstream("네이버 뉴스", "기사를 불러오지 못했습니다.");
+        }
+        NewsArticleDto a = parseNaverArticle(html == null ? "" : html, url);
+        if (a.blocks().stream().noneMatch(b -> b.type().equals("text"))) throw ApiException.upstream("네이버 뉴스", "기사 본문을 찾지 못했습니다.");
+        return a;
+    }
+
+    static NewsArticleDto parseNaverArticle(String html, String url) {
+        return NaverArticleParser.parse(html, url);
     }
 
     // ------------------------------------------------------------------ 구글

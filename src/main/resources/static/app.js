@@ -40,6 +40,30 @@
 })();
 
 // =====================================================================
+// 왼쪽 메뉴 접기 / 펴기
+// =====================================================================
+
+(function initSideToggle() {
+  const app = document.querySelector('.app');
+  const btn = document.getElementById('side-toggle');
+  if (!app || !btn) return;
+  const apply = (collapsed) => {
+    app.classList.toggle('collapsed', collapsed);
+    btn.setAttribute('aria-expanded', !collapsed);
+    btn.setAttribute('aria-label', collapsed ? '메뉴 펼치기' : '메뉴 접기');
+    btn.title = collapsed ? '메뉴 펼치기' : '메뉴 접기';
+  };
+  let collapsed = false;
+  try { collapsed = localStorage.getItem('sideCollapsed') === '1'; } catch { /* 무시 */ }
+  apply(collapsed);
+  btn.addEventListener('click', () => {
+    collapsed = !collapsed;
+    apply(collapsed);
+    try { localStorage.setItem('sideCollapsed', collapsed ? '1' : '0'); } catch { /* 무시 */ }
+  });
+})();
+
+// =====================================================================
 // 공통 유틸
 // =====================================================================
 
@@ -157,7 +181,10 @@ const views = {
 function route() {
   const [, name = '', param] = location.hash.replace(/^#/, '').split('/');
   const view = views[name] ? name : 'home';
-  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.route === view));
+  document.querySelectorAll('[data-route]').forEach((t) => {
+    t.classList.toggle('active', t.dataset.route === view);
+    if (t.dataset.route === view) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current');
+  });
   document.querySelectorAll('.view').forEach((v) => { v.hidden = v.id !== `view-${view}`; });
   window.scrollTo(0, 0);
   views[view](param);
@@ -191,19 +218,41 @@ async function loadStatus() {
 
 const TYPE_ORDER = ['STOCK', 'GOLD', 'CURRENCY', 'REAL_ESTATE', 'ETC'];
 const ALLOC_COLORS = { STOCK: 'var(--alloc-1)', GOLD: 'var(--alloc-2)', CURRENCY: 'var(--alloc-3)', REAL_ESTATE: 'var(--alloc-4)', ETC: 'var(--alloc-5)' };
-const FX_MAIN = ['USD', 'JPY', 'EUR', 'CNH', 'GBP'];
-const DASH_STOCKS = 5;
+const DASH_HOLDINGS = 4;
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+let sparkRange = store.get('sparkRange', '1m');
+let holdSort = store.get('holdSort', 'value');
 
 function renderHome() {
-  dashNews();
+  drawGreeting();
+  syncSeg('#spark-ranges', 'range', sparkRange);
+  const masked = store.get('maskMoney', false);
+  $('#view-home').classList.toggle('masked', masked);
+  $('#mask-toggle').setAttribute('aria-pressed', masked);
   dashPortfolio();
-  dashGold();
-  dashExchange();
-  dashStocks();
-  dashRealEstate();
-  dashSubscription();
+  dashMarket();
+  dashNews();
 }
 
+function drawGreeting() {
+  const now = new Date();
+  const h = now.getHours();
+  $('#greet').textContent = h >= 5 && h < 11 ? '좋은 아침이에요'
+    : h < 17 && h >= 11 ? '좋은 오후예요'
+      : h < 22 && h >= 17 ? '좋은 저녁이에요' : '편안한 밤 보내세요';
+  $('#today').innerHTML = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 <b>${WEEKDAYS[now.getDay()]}요일</b>`;
+}
+
+/** 세그먼트 버튼(기간 선택) 활성 표시 */
+function syncSeg(sel, key, value) {
+  document.querySelectorAll(`${sel} button`).forEach((b) => {
+    b.classList.toggle('active', b.dataset[key] === value);
+    b.setAttribute('aria-pressed', b.dataset[key] === value);
+  });
+}
+
+/** 내 투자 화면에서 쓰는 비중 막대 */
 function allocBar(allocation) {
   if (!allocation.length) return '';
   const sorted = [...allocation].sort((a, b) => TYPE_ORDER.indexOf(a.assetType) - TYPE_ORDER.indexOf(b.assetType));
@@ -214,32 +263,266 @@ function allocBar(allocation) {
     </div>`;
 }
 
+// ---------------------------------------------------------------------
+// 나의 총자산 · 내 투자 종목
+// ---------------------------------------------------------------------
+
 async function dashPortfolio() {
-  const body = $('#d-portfolio .dcard-body');
-  body.innerHTML = skeleton('lg', 'md', 'sm');
+  const total = $('#d-total .pbody');
+  const hold = $('#d-holdings .pbody');
+  total.innerHTML = skeleton('lg', 'md', 'sm');
+  hold.innerHTML = skeleton('md', 'md', 'md', 'md');
+  $('#hold-count').textContent = '';
   try {
     const p = await data.portfolio();
     if (!p.items.length) {
-      body.innerHTML = '<div class="derr">아직 등록한 자산이 없습니다. 눌러서 보유 자산을 추가하세요.</div>';
+      total.innerHTML = `<div class="empty-cta"><p>아직 등록한 자산이 없어요.</p><a class="btn primary" href="#/portfolio">+ 자산 추가하기</a></div>`;
+      hold.innerHTML = '<div class="derr">자산을 추가하면 여기에 보유 종목이 나와요.</div>';
       return;
     }
-    const top = p.items.filter((h) => h.value != null).sort((a, b) => b.value - a.value).slice(0, 4);
-    body.innerHTML = `
-      <div class="kpis">
-        <div><div class="label">총 평가금액</div><div class="big">${won(p.totalValue)}</div></div>
-        <div><div class="label">평가손익</div><div class="v ${signCls(p.totalProfit)}">${signed(p.totalProfit)}원</div>
-          <div class="sub ${signCls(p.totalProfitRate)}">${pct(p.totalProfitRate)}</div></div>
-        <div><div class="label">총 매입금액</div><div class="v">${won(p.totalCost)}</div></div>
-      </div>
-      ${allocBar(p.allocation)}
-      <div class="dlist">${top.map((h) => `
-        <div class="r"><span class="nm">${esc(h.name)}<small>${esc(h.assetTypeLabel)}</small></span>
-          <span class="vals">${won(h.value)}<small class="${signCls(h.profitRate)}">${pct(h.profitRate)}</small></span></div>`).join('')}
-      </div>
-      ${p.unpricedCount ? `<div class="dnote">현재가를 못 구한 자산 ${p.unpricedCount}개는 합계에서 빠졌습니다.</div>` : ''}`;
+    drawTotal(total, p);
+    drawHoldings(hold, p);
   } catch (e) {
-    body.innerHTML = cardError(e);
+    total.innerHTML = cardError(e);
+    hold.innerHTML = cardError(e);
   }
+}
+
+function drawTotal(el, p) {
+  const sorted = [...p.allocation].sort((a, b) => TYPE_ORDER.indexOf(a.assetType) - TYPE_ORDER.indexOf(b.assetType));
+  el.innerHTML = `
+    <div class="total-row">
+      <div class="total-val money">${nf0.format(p.totalValue ?? 0)}<small>원</small></div>
+      <div class="total-chg ${signCls(p.totalProfit)}"><span class="money">${signed(p.totalProfit)}원</span> <b>${pct(p.totalProfitRate)}</b> <span class="muted">평가손익</span></div>
+    </div>
+    <div class="alloc-bar big-bar">${sorted.map((a) => `<span style="flex:${Number(a.ratio)};background:${ALLOC_COLORS[a.assetType]}" title="${esc(a.label)} ${nf2.format(a.ratio)}%"></span>`).join('')}</div>
+    <div class="alloc-legend2">${sorted.map((a) => `
+      <span><i style="background:${ALLOC_COLORS[a.assetType]}"></i>${esc(a.label)} <b>${nf0.format(Math.round(a.ratio))}%</b></span>`).join('')}
+    </div>
+    <div class="total-foot muted small">총 매입 <span class="money">${won(p.totalCost)}</span> · 자산 ${p.items.length}개${p.unpricedCount ? ` · 현재가 없는 ${p.unpricedCount}개 제외` : ''}</div>`;
+}
+
+function drawHoldings(el, p) {
+  const priced = p.items.filter((h) => h.value != null);
+  $('#hold-count').textContent = p.items.length;
+  $('#hold-sort').textContent = holdSort === 'value' ? '평가금액순 ↕' : '수익률순 ↕';
+  const key = holdSort === 'value' ? 'value' : 'profitRate';
+  const top = priced.sort((a, b) => Number(b[key] ?? -Infinity) - Number(a[key] ?? -Infinity)).slice(0, DASH_HOLDINGS);
+  el.innerHTML = `
+    <div class="hold-list">${top.map((h) => `
+      <a class="hold" href="${h.assetType === 'STOCK' && h.code ? `#/stock/${esc(h.code)}` : '#/portfolio'}">
+        <span class="avatar t-${esc(h.assetType)}">${esc([...(h.name || '?')][0].toUpperCase())}</span>
+        <span class="hold-nm">${esc(h.name)}<small>${esc(h.assetTypeLabel)}</small></span>
+        <span class="hold-v money">₩${nf0.format(h.value)}</span>
+        <span class="hold-r ${signCls(h.profitRate)}">${pct(h.profitRate)}</span>
+      </a>`).join('')}
+    </div>
+    ${p.items.length > top.length ? `<a class="more-link" href="#/portfolio">전체 ${p.items.length}개 보기 →</a>` : ''}`;
+}
+
+$('#hold-sort').addEventListener('click', () => {
+  holdSort = holdSort === 'value' ? 'rate' : 'value';
+  store.set('holdSort', holdSort);
+  data.portfolio().then((p) => p.items.length && drawHoldings($('#d-holdings .pbody'), p)).catch(() => {});
+});
+
+$('#mask-toggle').addEventListener('click', () => {
+  const on = !store.get('maskMoney', false);
+  store.set('maskMoney', on);
+  $('#view-home').classList.toggle('masked', on);
+  $('#mask-toggle').setAttribute('aria-pressed', on);
+});
+
+// ---------------------------------------------------------------------
+// 오늘의 시장 (금 · 달러 · 관심종목 · 아파트 · 청약)
+// ---------------------------------------------------------------------
+
+function dashMarket() {
+  tileGold();
+  tileUsd();
+  tileStock();
+  tileApt();
+  tileSubscription();
+}
+
+$('#spark-ranges').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-range]');
+  if (!b || b.dataset.range === sparkRange) return;
+  sparkRange = b.dataset.range;
+  store.set('sparkRange', sparkRange);
+  syncSeg('#spark-ranges', 'range', sparkRange);
+  tileGold();
+  tileUsd();
+  tileStock();
+});
+
+const tileBody = (id) => $(`#${id} .tile-body`);
+const tileLoading = (id) => { tileBody(id).innerHTML = skeleton('lg', 'sm', 'md'); };
+const tileErr = (id, e) => { tileBody(id).innerHTML = cardError(e); };
+
+function tileHtml({ value, unit = '', change, changeLabel = '전일 대비', viz = '', foot = '' }) {
+  return `
+    <div class="tile-val">${value}${unit ? `<small>${unit}</small>` : ''}</div>
+    <div class="tile-chg ${signCls(change)}">${change == null ? '&nbsp;' : `${pct(change)} <span>${changeLabel}</span>`}</div>
+    <div class="tile-viz">${viz}</div>
+    <div class="tile-foot">${foot}</div>`;
+}
+
+/** 작은 추이 그래프. 시작값 점선 기준선 + 선 + 옅은 면 */
+function sparkline(values, color) {
+  const v = values.filter((x) => x != null && Number.isFinite(x));
+  if (v.length < 2) return '<div class="spark-empty">추이 데이터 없음</div>';
+  const W = 240, H = 56, P = 4;
+  const min = Math.min(...v), max = Math.max(...v), span = max - min || 1;
+  const x = (i) => P + (i * (W - 2 * P)) / (v.length - 1);
+  const y = (val) => P + (H - 2 * P) * (1 - (val - min) / span);
+  const pts = v.map((val, i) => `${x(i).toFixed(1)},${y(val).toFixed(1)}`);
+  const id = `sg${Math.random().toString(36).slice(2, 8)}`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="${color}" stop-opacity=".18"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+    <line x1="${P}" x2="${W - P}" y1="${y(v[0]).toFixed(1)}" y2="${y(v[0]).toFixed(1)}" class="spark-base"/>
+    <path d="M${pts[0]} L${pts.join(' L')} L${x(v.length - 1).toFixed(1)},${H} L${P},${H} Z" fill="url(#${id})"/>
+    <polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    <circle cx="${x(v.length - 1).toFixed(1)}" cy="${y(v[v.length - 1]).toFixed(1)}" r="3" fill="${color}"/>
+  </svg>`;
+}
+
+const sparkFrom = () => periodFor(sparkRange);
+const rangeLabel = () => ({ '7d': '1주', '1m': '1개월', '3m': '3개월' }[sparkRange] || '');
+
+async function tileGold() {
+  const id = 't-gold';
+  tileLoading(id);
+  try {
+    const { from, to } = sparkFrom();
+    const h = await data.goldHistory(from, to);
+    const n = h.close.length;
+    if (!n) { tileBody(id).innerHTML = '<div class="derr">최근 시세가 없습니다.</div>'; return; }
+    const close = h.close[n - 1], chg = h.change[n - 1];
+    const rate = chg != null && close - chg ? (chg / (close - chg)) * 100 : null;
+    tileBody(id).innerHTML = tileHtml({
+      value: nf0.format(Math.round(close * 3.75)), unit: '원', change: rate,
+      viz: sparkline(h.close, 'var(--gold)'),
+      foot: `g당 ${nf0.format(close)}원 · ${esc(h.end.slice(5).replace('-', '.'))} 기준`,
+    });
+    $('#market-asof').textContent = `${h.end.slice(5).replace('-', '.')} 기준 · 그래프 ${rangeLabel()}`;
+  } catch (e) { tileErr(id, e); }
+}
+
+async function tileUsd() {
+  const id = 't-usd';
+  tileLoading(id);
+  const { from, to } = sparkFrom();
+  const [hist, today] = await Promise.allSettled([data.fxHistory(from, to), data.exchange()]);
+  try {
+    const usd = hist.status === 'fulfilled' ? (hist.value.series.USD || []).filter((v) => v != null) : [];
+    const rates = today.status === 'fulfilled' ? today.value.rates : [];
+    const r = (c) => rates.find((x) => x.code === c);
+    const base = r('USD')?.baseRate ?? usd[usd.length - 1];
+    if (base == null) throw (hist.reason || today.reason || new Error('환율을 불러오지 못했습니다.'));
+    const rate = usd.length >= 2 ? ((usd[usd.length - 1] / usd[usd.length - 2]) - 1) * 100 : null;
+    const eur = r('EUR')?.baseRate, jpy = r('JPY')?.baseRate;
+    tileBody(id).innerHTML = tileHtml({
+      value: num(base), change: rate == null ? null : +rate.toFixed(2),
+      viz: sparkline(usd, 'var(--s1)'),
+      foot: [eur != null && `유로 ${num(eur)}`, jpy != null && `엔(100) ${num(jpy)}`].filter(Boolean).join(' · ') || '매매기준율',
+    });
+  } catch (e) { tileErr(id, e); }
+}
+
+data.stockIndex = (name) => cached(`index:${name}`, () => api(`/api/stocks/index?name=${name}`), 60_000);
+
+/** 관심종목이 있으면 관심종목, 없으면 오늘의 코스피 */
+async function tileStock() {
+  const id = 't-stock';
+  tileLoading(id);
+  let watch = [];
+  try { watch = await data.watchlist(); } catch { /* 관심종목을 못 불러와도 지수는 보여줌 */ }
+  if (!watch.length) { tileIndex(id); return; }
+  const [first, ...rest] = watch;
+  const names = await nameLookup().catch(() => ({}));
+  const nm = (s) => s.name || names[s.code] || s.code;
+  $(`#${id} .tile-name`).innerHTML = `${esc(nm(first))} <small>${esc(first.code)}</small>`;
+  const others = rest.slice(0, 2);
+  try {
+    const q = await data.quote(first.code);
+    tileBody(id).innerHTML = tileHtml({
+      value: num(q.price, nf0), unit: '원', change: q.changeRate == null ? null : Number(q.changeRate),
+      viz: `<div class="mini-list">${others.map((s) => `
+        <div data-code="${esc(s.code)}"><span>${esc(nm(s))}</span><b class="muted">…</b></div>`).join('') || '<div class="muted small">관심종목을 더 추가해 보세요</div>'}</div>`,
+      foot: `관심종목 ${watch.length}개`,
+    });
+  } catch (e) { tileErr(id, e); return; }
+  others.forEach(async (s) => {
+    const cell = tileBody(id).querySelector(`[data-code="${CSS.escape(s.code)}"] b`);
+    try {
+      const q = await data.quote(s.code);
+      cell.className = signCls(q.changeRate);
+      cell.textContent = `${num(q.price, nf0)} ${pct(q.changeRate)}`;
+    } catch { cell.textContent = '조회 실패'; }
+  });
+}
+
+const SPARK_POINTS = { '7d': 5, '1m': 22, '3m': 65 };
+
+async function tileIndex(id) {
+  $(`#${id} .tile-name`).innerHTML = '코스피 <small>KOSPI</small>';
+  const [kospi, kosdaq] = await Promise.allSettled([data.stockIndex('KOSPI'), data.stockIndex('KOSDAQ')]);
+  if (kospi.status !== 'fulfilled') { tileErr(id, kospi.reason); return; }
+  const k = kospi.value;
+  const q = kosdaq.status === 'fulfilled' ? kosdaq.value : null;
+  tileBody(id).innerHTML = tileHtml({
+    value: num(k.value), change: k.changeRate == null ? null : Number(k.changeRate),
+    viz: sparkline(k.closes.slice(-(SPARK_POINTS[sparkRange] || 22)).map(Number), 'var(--s1)'),
+    foot: q ? `코스닥 ${num(q.value)} <span class="${signCls(q.changeRate)}">${pct(q.changeRate)}</span>` : '관심종목을 추가하면 여기에 나와요',
+  });
+}
+
+async function tileApt() {
+  const id = 't-apt';
+  const region = store.get('reRegion', '11680');
+  const code = region === 'custom' ? store.get('reCode', '') : region;
+  const ym = store.get('reMonth', null) || defaultMonth();
+  const regionName = (REGIONS.find(([c]) => c === code) || [code, `지역 ${code}`])[1];
+  $(`#${id} .tile-name`).innerHTML = `${esc(regionName)} <small>아파트 중간값</small>`;
+  if (!/^\d{5}$/.test(code)) {
+    tileBody(id).innerHTML = '<div class="derr">부동산 화면에서 지역을 조회하면 여기에 요약됩니다.</div>';
+    return;
+  }
+  tileLoading(id);
+  try {
+    const s = aptStats(await data.apt(code, ym.replace('-', '')));
+    if (!s) { tileBody(id).innerHTML = `<div class="derr">${esc(ym)} 거래가 없습니다.</div>`; return; }
+    const lo = s.min ?? s.median, hi = s.max;
+    const pos = hi > lo ? ((s.median - lo) / (hi - lo)) * 100 : 50;
+    tileBody(id).innerHTML = tileHtml({
+      value: esc(manwon(s.median)), change: null,
+      viz: `<div class="range"><div class="range-bar"><i style="left:${pos.toFixed(1)}%"></i></div>
+        <div class="range-lbl"><span>${esc(manwon(lo))}</span><span>${esc(manwon(hi))}</span></div></div>`,
+      foot: `${esc(ym.replace('-', '.'))} · 거래 ${nf0.format(s.count)}건`,
+    });
+  } catch (e) { tileErr(id, e); }
+}
+
+async function tileSubscription() {
+  const id = 't-sub';
+  tileLoading(id);
+  try {
+    const res = await data.subscriptions();
+    if (!res.items.length && Object.keys(res.errors || {}).length) {
+      tileBody(id).innerHTML = `<div class="derr"><b>불러오지 못했습니다</b>${esc(subErrorText(res.errors))}</div>`;
+      return;
+    }
+    const open = res.items.filter((n) => subGroup(n.status) === 'open');
+    const soon = res.items.filter((n) => subGroup(n.status) === 'soon');
+    const next = open[0] || soon[0];
+    tileBody(id).innerHTML = `
+      <div class="tile-val">${nf0.format(open.length + soon.length)}<small>건</small></div>
+      <div class="tile-chg accent">접수 중 ${nf0.format(open.length)} · 예정 ${nf0.format(soon.length)}</div>
+      <div class="tile-viz next-sub">${next ? `<b>${esc(next.name)}</b><span>${subPeriod(next)}</span>` : '<span class="muted">다가오는 청약이 없어요</span>'}</div>
+      <div class="tile-foot">청약홈 · LH 최근 60일</div>`;
+  } catch (e) { tileErr(id, e); }
 }
 
 // ---------------------------------------------------------------------
@@ -269,13 +552,17 @@ async function loadNewsCol(source, el) {
   try {
     const items = await data.news(source, newsPeriod);
     if (!items.length) { el.innerHTML = '<li class="derr">이 기간의 기사가 없습니다.</li>'; return; }
-    el.innerHTML = items.slice(0, 6).map((n) => {
-      const url = /^https?:\/\//.test(n.url || '') ? n.url : null;
-      return `<li>
-        ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="news-t">${esc(n.title)}</a>` : `<span class="news-t">${esc(n.title)}</span>`}
+    el.newsItems = items.slice(0, 5);
+    el.innerHTML = el.newsItems.map((n, i) => {
+      const inner = `<span class="news-t">${esc(n.title)}</span>
         ${n.titleKo ? `<span class="news-ko">${esc(n.titleKo)}</span>` : ''}
-        <span class="news-m">${esc(n.press || '')}${n.press && n.publishedAt ? ' · ' : ''}${esc(timeAgo(n.publishedAt))}</span>
-      </li>`;
+        <span class="news-m">${esc(n.press || '')}${n.press && n.publishedAt ? '<i>·</i>' : ''}${esc(timeAgo(n.publishedAt))}</span>`;
+      // 네이버 기사는 사이트 안에서 바로 보기, 그 밖(구글 등)은 언론사 페이지를 새 창으로
+      if (n.readerUrl) return `<li><button type="button" class="news-item" data-i="${i}">${inner}</button></li>`;
+      const url = /^https?:\/\//.test(n.url || '') ? n.url : null;
+      return url
+        ? `<li><a class="news-item" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${inner}<span class="news-ext" aria-hidden="true">↗</span></a></li>`
+        : `<li><div class="news-item">${inner}</div></li>`;
     }).join('');
   } catch (e) {
     el.innerHTML = `<li>${cardError(e)}</li>`;
@@ -283,13 +570,96 @@ async function loadNewsCol(source, el) {
 }
 
 function dashNews() {
-  document.querySelectorAll('#news-periods button').forEach((b) => {
-    b.classList.toggle('active', b.dataset.period === newsPeriod);
-    b.setAttribute('aria-pressed', b.dataset.period === newsPeriod);
-  });
+  syncSeg('#news-periods', 'period', newsPeriod);
   loadNewsCol('naver', $('#news-naver'));
   loadNewsCol('google', $('#news-google'));
 }
+
+// 뉴스 바로 보기 — 네이버 뉴스 기사를 네이버 기사 화면처럼
+data.article = (url) => cached(`article:${url}`, () => api(`/api/news/article?url=${encodeURIComponent(url)}`), 30 * 60_000);
+
+const reader = $('#news-reader');
+
+document.querySelectorAll('.news-list').forEach((list) => list.addEventListener('click', (e) => {
+  const b = e.target.closest('button.news-item');
+  if (!b || !list.newsItems) return;
+  openReader(list.newsItems[Number(b.dataset.i)]);
+}));
+
+/** "2026-11-24 15:44:07" → "2026.11.24. 오후 3:44" (네이버 기사 화면 표기) */
+function naverTime(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/.exec(s || '');
+  if (!m) return esc(s || '');
+  const h = Number(m[4]);
+  return `${m[1]}.${m[2]}.${m[3]}. ${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${m[5]}`;
+}
+
+function articleBlock(b) {
+  switch (b.type) {
+    case 'subtitle': return `<div class="art-sub">${b.text.split('\n').map(esc).join('<br>')}</div>`;
+    case 'heading': return `<h3 class="art-h">${esc(b.text)}</h3>`;
+    case 'image': return `<figure class="art-fig"><img src="${esc(b.src)}" alt="${esc(b.text || '')}" referrerpolicy="no-referrer" loading="lazy" onerror="this.closest('figure').remove()">${b.text ? `<figcaption>${b.text.split('\n').map(esc).join('<br>')}</figcaption>` : ''}</figure>`;
+    default: return `<p>${esc(b.text)}</p>`;
+  }
+}
+
+function renderArticle(a, n) {
+  const press = a.press || n.press || '';
+  return `
+    <header class="art-head">
+      <div class="art-press">
+        ${a.pressLogo ? `<img src="${esc(a.pressLogo)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}
+        <b>${esc(press)}</b>
+        ${a.categories?.length ? `<span class="art-cat">${a.categories.map(esc).join(' · ')}</span>` : ''}
+      </div>
+      <h2 id="nr-title">${esc(a.title || n.title)}</h2>
+      <div class="art-info">
+        <div class="art-dates">
+          ${a.publishedAt ? `<span><em>입력</em>${naverTime(a.publishedAt)}</span>` : ''}
+          ${a.modifiedAt ? `<span><em>수정</em>${naverTime(a.modifiedAt)}</span>` : ''}
+          ${a.originUrl ? `<a href="${esc(a.originUrl)}" target="_blank" rel="noopener noreferrer">기사원문</a>` : ''}
+        </div>
+        ${a.reporter ? `<span class="art-by">${esc(a.reporter)}</span>` : ''}
+      </div>
+    </header>
+    <div class="art-body">${a.blocks
+      .filter((b) => !(b.type === 'text' && a.reporterEmail && b.text === a.reporterEmail)) // 끝줄 이메일은 아래 기자 카드로
+      .map(articleBlock).join('')}</div>
+    ${a.reporter || a.reporterEmail ? `
+      <div class="art-card">
+        <span class="art-avatar" aria-hidden="true">${esc([...(a.reporter || press || '?')][0])}</span>
+        <div><b>${esc(a.reporter || press)}</b>${a.reporterEmail ? `<span>${esc(a.reporterEmail)}</span>` : ''}</div>
+      </div>` : ''}
+    ${a.copyright ? `<p class="art-copy">${esc(a.copyright)}</p>` : ''}
+    <p class="art-src">네이버 뉴스에서 가져온 기사입니다. 저작권은 각 언론사에 있습니다.</p>`;
+}
+
+async function openReader(n) {
+  const body = $('#nr-body');
+  const token = Symbol('reader');
+  reader.token = token;
+  $('#nr-open').href = n.url || n.readerUrl;
+  $('#nr-open').hidden = !(n.url || n.readerUrl);
+  $('#nr-meta').innerHTML = `<span class="src-badge naver">N</span>네이버 뉴스`;
+  body.innerHTML = `<header class="art-head"><div class="art-press"><b>${esc(n.press || '')}</b></div><h2 id="nr-title">${esc(n.title)}</h2></header>
+    <div class="art-body">${skeleton('md', 'md', 'sm', 'md', 'md', 'sm', 'md')}</div>`;
+  body.scrollTop = 0;
+  if (!reader.open) reader.showModal();
+  try {
+    const a = await data.article(n.readerUrl);
+    if (reader.token !== token) return; // 그 사이 다른 기사를 열었으면 무시
+    body.innerHTML = renderArticle(a, n);
+  } catch (e) {
+    if (reader.token !== token) return;
+    body.innerHTML = `<header class="art-head"><h2 id="nr-title">${esc(n.title)}</h2></header>
+      ${n.summary ? `<div class="art-body"><p>${esc(n.summary)}</p></div>` : ''}
+      <div class="reader-note">${esc(e.message)}<br>전체 내용은 원문에서 볼 수 있어요.
+        <a class="btn primary" href="${esc(n.url || n.readerUrl)}" target="_blank" rel="noopener noreferrer">원문 기사 열기 ↗</a></div>`;
+  }
+}
+
+$('#nr-close').addEventListener('click', () => reader.close());
+reader.addEventListener('click', (e) => { if (e.target === reader) reader.close(); }); // 바깥 클릭으로 닫기
 
 $('#news-periods').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-period]');
@@ -298,120 +668,6 @@ $('#news-periods').addEventListener('click', (e) => {
   store.set('newsPeriod', newsPeriod);
   dashNews();
 });
-
-async function dashGold() {
-  const body = $('#d-gold .dcard-body');
-  body.innerHTML = skeleton('lg', 'md', 'sm');
-  try {
-    const list = await data.gold();
-    if (!list.length) { body.innerHTML = '<div class="derr">최근 시세가 없습니다.</div>'; return; }
-    const latestDate = list[0].baseDate;
-    const latest = list.filter((g) => g.baseDate === latestDate);
-    const main = latest.find((g) => /1kg/i.test(g.itemName || '')) || latest[0];
-    body.innerHTML = `
-      <div class="label muted small">${esc(main.itemName)}</div>
-      <div class="big">${num(main.close, nf0)}<span class="muted small"> 원/g</span></div>
-      <div class="${signCls(main.change)}">${signed(main.change)} (${pct(main.changeRate)})</div>
-      <div class="dnote">한 돈(3.75g) ≈ ${main.close == null ? '-' : won(main.close * 3.75)} · ${fmtDate(main.baseDate)} 기준</div>`;
-  } catch (e) {
-    body.innerHTML = cardError(e);
-  }
-}
-
-async function dashExchange() {
-  const body = $('#d-exchange .dcard-body');
-  body.innerHTML = skeleton('md', 'md', 'md', 'sm');
-  try {
-    const fx = await data.exchange();
-    const main = FX_MAIN.slice(0, 4).map((c) => fx.rates.find((r) => r.code === c)).filter(Boolean);
-    body.innerHTML = `
-      <div class="dlist">${main.map((r) => `
-        <div class="r"><span class="nm">${esc(r.code)}${r.unit !== 1 ? ` ${r.unit}` : ''}<small>${esc(r.name)}</small></span>
-          <span class="vals"><b>${num(r.baseRate)}</b>원</span></div>`).join('')}
-      </div>
-      <div class="dnote">매매기준율 · ${esc(fx.date)} 기준</div>`;
-  } catch (e) {
-    body.innerHTML = cardError(e);
-  }
-}
-
-/** 관심종목이 없으면 내 투자에 등록한 주식을 대신 보여줍니다 */
-async function dashboardStockList() {
-  const watch = await data.watchlist();
-  if (watch.length) return { items: watch, source: 'watch' };
-  try {
-    const p = await data.portfolio();
-    const held = p.items.filter((h) => h.assetType === 'STOCK' && h.code)
-      .map((h) => ({ code: h.code, name: h.name }));
-    return { items: held, source: 'held' };
-  } catch {
-    return { items: [], source: 'held' };
-  }
-}
-
-async function dashStocks() {
-  const body = $('#d-stock .dcard-body');
-  body.innerHTML = skeleton('md', 'md', 'md');
-  let list;
-  try {
-    list = await dashboardStockList();
-  } catch (e) {
-    body.innerHTML = cardError(e);
-    return;
-  }
-  if (!list.items.length) {
-    body.innerHTML = '<div class="derr">관심종목이 없습니다. <a href="#/stock">주식 화면</a>에서 종목을 조회하고 ☆ 를 눌러 추가하세요.</div>';
-    return;
-  }
-  const shown = list.items.slice(0, DASH_STOCKS);
-  body.innerHTML = `
-    <div class="dlist">${shown.map((s) => `
-      <a class="r" href="#/stock/${esc(s.code)}" data-code="${esc(s.code)}">
-        <span class="nm"><span class="nm-text">${esc(s.name || s.code)}</span><small>${esc(s.code)}</small></span>
-        <span class="vals"><span class="skel sm" style="width:90px"></span></span>
-      </a>`).join('')}
-    </div>
-    <div class="dnote">${list.source === 'held' ? '관심종목이 없어 보유 주식을 보여줍니다.' : ''}${list.items.length > DASH_STOCKS ? ` 외 ${list.items.length - DASH_STOCKS}개` : ''}</div>`;
-
-  // 이름이 없는 종목은 내 투자에 등록한 이름으로 나중에 채웁니다 (내 투자 로딩을 기다리지 않음)
-  fillNames(body, shown.filter((s) => !s.name).map((s) => s.code));
-
-  // 종목마다 따로 불러와서 온 순서대로 채웁니다 (모의투자는 서버가 호출 간격을 둠)
-  shown.forEach(async (s) => {
-    const cell = body.querySelector(`[data-code="${CSS.escape(s.code)}"] .vals`);
-    try {
-      const q = await data.quote(s.code);
-      cell.innerHTML = `<b>${num(q.price, nf0)}</b><small class="${signCls(q.change)}">${pct(q.changeRate)}</small>`;
-    } catch (e) {
-      cell.innerHTML = `<small class="muted" title="${esc(e.message)}">${e.status === 503 ? '키 미설정' : '조회 실패'}</small>`;
-    }
-  });
-}
-
-async function dashRealEstate() {
-  const body = $('#d-realestate .dcard-body');
-  const region = store.get('reRegion', '11680');
-  const code = region === 'custom' ? store.get('reCode', '') : region;
-  const ym = store.get('reMonth', null) || defaultMonth();
-  const regionName = (REGIONS.find(([c]) => c === code) || [code, `지역코드 ${code}`])[1];
-  if (!/^\d{5}$/.test(code)) {
-    body.innerHTML = '<div class="derr">부동산 화면에서 지역을 한 번 조회하면 여기에 요약됩니다.</div>';
-    return;
-  }
-  body.innerHTML = skeleton('sm', 'lg', 'md');
-  try {
-    const trades = await data.apt(code, ym.replace('-', ''));
-    const s = aptStats(trades);
-    body.innerHTML = s ? `
-      <div class="label muted small">${esc(regionName)} · ${esc(ym.replace('-', '.'))} 아파트 매매</div>
-      <div class="big">${manwon(s.median)}</div>
-      <div class="muted small">중간 거래가</div>
-      <div class="dnote">거래 ${nf0.format(s.count)}건 · 최고 ${manwon(s.max)}${s.avgPy ? ` · 평당 ${manwon(Math.round(s.avgPy))}` : ''}</div>`
-      : `<div class="derr">${esc(regionName)} ${esc(ym)} 거래가 없습니다.</div>`;
-  } catch (e) {
-    body.innerHTML = cardError(e);
-  }
-}
 
 // =====================================================================
 // 내 투자 (상세)
@@ -1425,6 +1681,7 @@ function aptStats(trades) {
     count: valid.length,
     canceled: trades.length - valid.length,
     median: amounts[Math.floor(amounts.length / 2)],
+    min: amounts[0],
     max: amounts[amounts.length - 1],
     avgPy: perPyeong.length ? perPyeong.reduce((s, v) => s + v, 0) / perPyeong.length : null,
   };
@@ -1641,28 +1898,6 @@ $('#sub-form').addEventListener('submit', (e) => e.preventDefault());
 ['#sub-source', '#sub-status', '#sub-region'].forEach((s) => $(s).addEventListener('change', drawSubscriptions));
 $('#sub-filter').addEventListener('input', drawSubscriptions);
 $('#sub-refresh').addEventListener('click', () => { invalidate('subscriptions'); loadSubscriptions(); });
-
-async function dashSubscription() {
-  const body = $('#d-subscription .dcard-body');
-  body.innerHTML = skeleton('sm', 'lg', 'md');
-  try {
-    const res = await data.subscriptions();
-    const open = res.items.filter((n) => subGroup(n.status) === 'open');
-    const soon = res.items.filter((n) => subGroup(n.status) === 'soon');
-    if (!res.items.length && Object.keys(res.errors || {}).length) {
-      body.innerHTML = `<div class="derr"><b>불러오지 못했습니다</b>${esc(subErrorText(res.errors))}</div>`;
-      return;
-    }
-    const next = open.concat(soon).slice(0, 3);
-    body.innerHTML = `
-      <div class="label muted small">청약홈 · LH 최근 60일</div>
-      <div class="big">접수중 ${nf0.format(open.length)}건</div>
-      <div class="muted small">접수예정 · 공고중 ${nf0.format(soon.length)}건</div>
-      ${next.length ? `<div class="dnote">${next.map((n) => esc(n.name)).join(' · ')}</div>` : ''}`;
-  } catch (e) {
-    body.innerHTML = cardError(e);
-  }
-}
 
 // =====================================================================
 // 모의투자

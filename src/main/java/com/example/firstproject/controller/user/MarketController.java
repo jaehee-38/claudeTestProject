@@ -7,7 +7,9 @@ import com.example.firstproject.dto.FxHistoryDto;
 import com.example.firstproject.dto.GoldHistoryDto;
 import com.example.firstproject.dto.GoldPriceDto;
 import com.example.firstproject.dto.KisBalanceDto;
+import com.example.firstproject.dto.NewsArticleDto;
 import com.example.firstproject.dto.NewsItemDto;
+import com.example.firstproject.dto.StockIndexDto;
 import com.example.firstproject.dto.StockQuoteDto;
 import com.example.firstproject.dto.SubscriptionListRes;
 import com.example.firstproject.service.ExchangeService;
@@ -85,6 +87,12 @@ public class MarketController {
         return stockService.quote(code);
     }
 
+    // GET /api/stocks/index?name=KOSPI|KOSDAQ  (지수 + 최근 일별 종가)
+    @GetMapping("/stocks/index")
+    public StockIndexDto stockIndex(@RequestParam(defaultValue = "KOSPI") String name) {
+        return stockService.index(name);
+    }
+
     // GET /api/stocks/balance  (한국투자증권 계좌 잔고)
     @GetMapping("/stocks/balance")
     public KisBalanceDto balance() {
@@ -95,6 +103,12 @@ public class MarketController {
     @GetMapping("/real-estate/apt-trades")
     public List<AptTradeDto> aptTrades(@RequestParam String lawdCd, @RequestParam String dealYm) {
         return realEstateService.aptTrades(lawdCd, dealYm);
+    }
+
+    // GET /api/news/article?url=https://n.news.naver.com/mnews/article/…  (사이트 안에서 기사 본문 보기)
+    @GetMapping("/news/article")
+    public NewsArticleDto newsArticle(@RequestParam String url) {
+        return newsService.article(url);
     }
 
     // GET /api/news?source=naver|google&period=day|week|month&topic=all  (홈 화면 투자 이슈)

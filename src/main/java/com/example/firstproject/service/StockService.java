@@ -5,6 +5,7 @@ import com.example.firstproject.common.Nums;
 import com.example.firstproject.common.TtlCache;
 import com.example.firstproject.config.InvestProperties;
 import com.example.firstproject.dto.KisBalanceDto;
+import com.example.firstproject.dto.StockIndexDto;
 import com.example.firstproject.dto.StockQuoteDto;
 import com.example.firstproject.service.external.KisTokenManager;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -15,7 +16,11 @@ import org.springframework.web.client.RestClient;
 
 import java.net.URI;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +36,11 @@ public class StockService {
 
     private static final Pattern STOCK_CODE = Pattern.compile("^[0-9A-Z]{6}$");
     private static final String TR_PRICE = "FHKST01010100";
+    private static final String TR_INDEX_DAILY = "FHPUP02120000";
+    /** 화면 이름 → KIS 업종코드 */
+    private static final Map<String, String[]> INDEXES = Map.of(
+            "KOSPI", new String[]{"0001", "코스피"},
+            "KOSDAQ", new String[]{"1001", "코스닥"});
     private static final String TR_BALANCE_MOCK = "VTTC8434R";
     private static final String TR_BALANCE_REAL = "TTTC8434R";
 
@@ -40,6 +50,7 @@ public class StockService {
     private final KisTokenManager tokenManager;
 
     private final TtlCache<String, StockQuoteDto> quoteCache = new TtlCache<>(Duration.ofSeconds(30));
+    private final TtlCache<String, StockIndexDto> indexCache = new TtlCache<>(Duration.ofSeconds(60));
     private final TtlCache<String, KisBalanceDto> balanceCache = new TtlCache<>(Duration.ofSeconds(30));
 
     private long lastCallAt = 0;
@@ -47,6 +58,46 @@ public class StockService {
     public StockQuoteDto quote(String rawCode) {
         String code = normalizeCode(rawCode);
         return quoteCache.get(code, () -> fetchQuote(code));
+    }
+
+    /** KOSPI / KOSDAQ 지수와 최근 일별 종가 (최대 약 100영업일) */
+    public StockIndexDto index(String rawName) {
+        String name = rawName == null ? "" : rawName.trim().toUpperCase();
+        String[] idx = INDEXES.get(name);
+        if (idx == null) throw ApiException.badRequest("지수는 KOSPI 또는 KOSDAQ 입니다.");
+        return indexCache.get(name, () -> fetchIndex(name, idx[0], idx[1]));
+    }
+
+    private StockIndexDto fetchIndex(String name, String code, String korName) {
+        String today = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.BASIC_ISO_DATE);
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("FID_PERIOD_DIV_CODE", "D");
+        params.put("FID_COND_MRKT_DIV_CODE", "U");
+        params.put("FID_INPUT_ISCD", code);
+        params.put("FID_INPUT_DATE_1", today);
+        JsonNode res = call("/uapi/domestic-stock/v1/quotations/inquire-index-daily-price", TR_INDEX_DAILY, params);
+        return parseIndex(name, korName, res);
+    }
+
+    /** output1: 현재 지수, output2: 일별 (최신이 앞) */
+    static StockIndexDto parseIndex(String name, String korName, JsonNode res) {
+        JsonNode o = res.path("output1");
+        List<String> dates = new ArrayList<>();
+        List<java.math.BigDecimal> closes = new ArrayList<>();
+        for (JsonNode d : res.path("output2")) {
+            String ymd = d.path("stck_bsop_date").asText("");
+            var close = num(d, "bstp_nmix_prpr");
+            if (ymd.length() != 8 || close == null) continue;
+            dates.add(ymd.substring(0, 4) + "-" + ymd.substring(4, 6) + "-" + ymd.substring(6));
+            closes.add(close);
+        }
+        Collections.reverse(dates);
+        Collections.reverse(closes);
+        var value = num(o, "bstp_nmix_prpr");
+        if (value == null && !closes.isEmpty()) value = closes.get(closes.size() - 1);
+        if (value == null) throw ApiException.upstream("한국투자증권", name + " 지수 데이터가 없습니다.");
+        return new StockIndexDto(name, korName, value,
+                num(o, "bstp_nmix_prdy_vrss"), num(o, "bstp_nmix_prdy_ctrt"), dates, closes);
     }
 
     public KisBalanceDto balance() {

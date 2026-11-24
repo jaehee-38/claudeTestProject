@@ -4,88 +4,139 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>My Invest</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="shell">
+<div class="app">
 
-  <header class="top">
+  <aside class="side">
     <a class="brand" href="#/">
-      <span class="brand-mark">◆</span>
-      <h1>My Invest</h1>
+      <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><rect x="3" y="14" width="5" height="11" rx="2.5"/><rect x="11.5" y="8" width="5" height="17" rx="2.5"/><rect x="20" y="3" width="5" height="22" rx="2.5"/></svg>
+      <h1>My Invest<span>.</span></h1>
     </a>
-    <div style="display:flex;align-items:center;gap:12px;">
+
+    <div class="side-label"><span>WORKSPACE</span>
+      <button type="button" class="side-toggle" id="side-toggle" aria-label="메뉴 접기" title="메뉴 접기">
+        <svg viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
+      </button>
+    </div>
+    <nav class="nav" aria-label="메뉴">
+      <a class="nav-link" href="#/" data-route="home" title="대시보드"><svg viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.5l8.5 7V19a1.5 1.5 0 0 1-1.5 1.5h-4.5v-6h-5v6H5A1.5 1.5 0 0 1 3.5 19z"/></svg><span>대시보드</span></a>
+      <a class="nav-link" href="#/portfolio" data-route="portfolio" title="내 투자"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7M3 12.5h18"/></svg><span>내 투자</span></a>
+      <a class="nav-link" href="#/stock" data-route="stock" title="주식 시세"><svg viewBox="0 0 24 24"><path d="M3.5 3.5v17h17"/><path d="m7.5 15 4-4.5 3 3 5-6"/></svg><span>주식 시세</span></a>
+      <a class="nav-link" href="#/gold" data-route="gold" title="금 시세"><svg viewBox="0 0 24 24"><path d="M3.5 19.5h17l-2.6-7.5H6.1z"/><path d="M8.6 12 10 7.5h4l1.4 4.5"/></svg><span>금 시세</span></a>
+      <a class="nav-link" href="#/exchange" data-route="exchange" title="환율"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.5 5.2 3.5 8.5s-1.1 6.1-3.5 8.5c-2.4-2.4-3.5-5.2-3.5-8.5S9.6 5.9 12 3.5z"/></svg><span>환율</span></a>
+      <a class="nav-link" href="#/realestate" data-route="realestate" title="부동산 시세"><svg viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="1.5"/><path d="M9 7.5h1.5M13.5 7.5H15M9 11h1.5M13.5 11H15M9 14.5h1.5M13.5 14.5H15M10.5 20.5v-3h3v3"/></svg><span>부동산 시세</span></a>
+      <a class="nav-link" href="#/subscription" data-route="subscription" title="청약"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h3"/></svg><span>청약</span></a>
+      <a class="nav-link" href="#/invest" data-route="invest" title="모의투자"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m10 8.5 5.5 3.5-5.5 3.5z"/></svg><span>모의투자</span></a>
+    </nav>
+
+    <div class="side-bottom">
+      <div class="promo">
+        <b>조금 더 넓게, 멀리.</b>
+        <p>나만의 투자 흐름을<br>차분하게 만들어가세요.</p>
+        <div class="promo-bars" aria-hidden="true"><i style="height:28%"></i><i style="height:40%"></i><i style="height:34%"></i><i style="height:55%"></i><i style="height:68%"></i><i style="height:60%"></i><i style="height:86%"></i><i style="height:100%"></i></div>
+      </div>
       <label class="theme-toggle" id="theme-toggle" title="다크/라이트 모드 전환">
         <span class="theme-toggle-icon" id="theme-icon">☀️</span>
-        <span class="theme-toggle-track">
-          <span class="theme-toggle-thumb"></span>
-        </span>
         <span id="theme-label">라이트</span>
+        <span class="theme-toggle-track"><span class="theme-toggle-thumb"></span></span>
       </label>
       <div id="key-status" class="key-status" aria-label="API 키 설정 상태"></div>
     </div>
-  </header>
+  </aside>
 
-  <nav class="tabs">
-    <a class="tab" href="#/" data-route="home">홈</a>
-    <a class="tab" href="#/portfolio" data-route="portfolio">내 투자</a>
-    <a class="tab" href="#/stock" data-route="stock">주식</a>
-    <a class="tab" href="#/gold" data-route="gold">금</a>
-    <a class="tab" href="#/exchange" data-route="exchange">환율</a>
-    <a class="tab" href="#/realestate" data-route="realestate">부동산</a>
-    <a class="tab" href="#/subscription" data-route="subscription">청약</a>
-    <a class="tab" href="#/invest" data-route="invest">모의투자</a>
-  </nav>
-
-  <main>
+  <main class="main">
 
     <!-- ================= 홈 (대시보드) ================= -->
     <section id="view-home" class="view">
-      <div class="dash">
-        <a class="dcard wide" href="#/portfolio" id="d-portfolio">
-          <div class="dcard-head"><h2>내 투자</h2><span class="more">자세히 →</span></div>
-          <div class="dcard-body"></div>
-        </a>
-        <div class="dcard wide" id="d-news">
-          <div class="dcard-head">
-            <h2>투자 이슈</h2>
-            <div class="fxc-ranges news-periods" id="news-periods" role="group" aria-label="기간">
-              <button type="button" data-period="day">오늘</button>
-              <button type="button" data-period="week">이번 주</button>
-              <button type="button" data-period="month">이번 달</button>
-            </div>
-          </div>
-          <div class="news-cols">
-            <section class="news-col">
-              <h3>국내 <span class="muted small">네이버</span></h3>
-              <ol id="news-naver" class="news-list"></ol>
-            </section>
-            <section class="news-col">
-              <h3>해외 <span class="muted small">Google 뉴스</span></h3>
-              <ol id="news-google" class="news-list"></ol>
-            </section>
-          </div>
+      <header class="page-head">
+        <div>
+          <h2 id="greet">안녕하세요</h2>
+          <p class="muted">오늘의 시장과 내 자산을 한눈에 확인하세요.</p>
         </div>
-        <a class="dcard" href="#/gold" id="d-gold">
-          <div class="dcard-head"><h2>금 시세</h2><span class="more">자세히 →</span></div>
-          <div class="dcard-body"></div>
-        </a>
-        <a class="dcard" href="#/exchange" id="d-exchange">
-          <div class="dcard-head"><h2>환율</h2><span class="more">자세히 →</span></div>
-          <div class="dcard-body"></div>
-        </a>
-        <div class="dcard" id="d-stock">
-          <div class="dcard-head"><h2>관심종목</h2><a class="more" href="#/stock">자세히 →</a></div>
-          <div class="dcard-body"></div>
+        <div class="today" id="today"></div>
+      </header>
+
+      <div class="hero">
+        <article class="panel" id="d-total">
+          <div class="panel-top">
+            <h3>나의 총자산</h3>
+            <button type="button" class="icon-btn" id="mask-toggle" aria-label="금액 가리기" title="금액 가리기">
+              <svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div class="pbody"></div>
+        </article>
+        <article class="panel" id="d-holdings">
+          <div class="panel-top">
+            <h3><a href="#/portfolio">내 투자 종목</a> <span class="count" id="hold-count"></span></h3>
+            <button type="button" class="sort-btn" id="hold-sort">평가금액순 ↕</button>
+          </div>
+          <div class="pbody"></div>
+        </article>
+      </div>
+
+      <div class="sec-head">
+        <h2>오늘의 시장 <span class="muted small" id="market-asof"></span></h2>
+        <div class="seg" id="spark-ranges" role="group" aria-label="그래프 기간">
+          <button type="button" data-range="7d">1주</button>
+          <button type="button" data-range="1m">1개월</button>
+          <button type="button" data-range="3m">3개월</button>
         </div>
-        <a class="dcard" href="#/realestate" id="d-realestate">
-          <div class="dcard-head"><h2>부동산</h2><span class="more">자세히 →</span></div>
-          <div class="dcard-body"></div>
+      </div>
+      <div class="tiles">
+        <a class="tile" href="#/gold" id="t-gold">
+          <div class="tile-top"><span class="tile-ic ic-gold"><svg viewBox="0 0 24 24"><path d="M3.5 19.5h17l-2.6-7.5H6.1z"/><path d="M8.6 12 10 7.5h4l1.4 4.5"/></svg></span><span class="arrow">→</span></div>
+          <div class="tile-name">국내 금 <small>1돈 · 3.75g</small></div>
+          <div class="tile-body"></div>
         </a>
-        <a class="dcard" href="#/subscription" id="d-subscription">
-          <div class="dcard-head"><h2>청약</h2><span class="more">자세히 →</span></div>
-          <div class="dcard-body"></div>
+        <a class="tile" href="#/exchange" id="t-usd">
+          <div class="tile-top"><span class="tile-ic ic-blue"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.5 5.2 3.5 8.5s-1.1 6.1-3.5 8.5c-2.4-2.4-3.5-5.2-3.5-8.5S9.6 5.9 12 3.5z"/></svg></span><span class="arrow">→</span></div>
+          <div class="tile-name">원 / 달러 <small>USD / KRW</small></div>
+          <div class="tile-body"></div>
         </a>
+        <a class="tile" href="#/stock" id="t-stock">
+          <div class="tile-top"><span class="tile-ic ic-blue"><svg viewBox="0 0 24 24"><path d="M3.5 3.5v17h17"/><path d="m7.5 15 4-4.5 3 3 5-6"/></svg></span><span class="arrow">→</span></div>
+          <div class="tile-name">관심종목</div>
+          <div class="tile-body"></div>
+        </a>
+        <a class="tile" href="#/realestate" id="t-apt">
+          <div class="tile-top"><span class="tile-ic ic-slate"><svg viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="1.5"/><path d="M9 7.5h1.5M13.5 7.5H15M9 11h1.5M13.5 11H15M9 14.5h1.5M13.5 14.5H15M10.5 20.5v-3h3v3"/></svg></span><span class="arrow">→</span></div>
+          <div class="tile-name">아파트</div>
+          <div class="tile-body"></div>
+        </a>
+        <a class="tile" href="#/subscription" id="t-sub">
+          <div class="tile-top"><span class="tile-ic ic-blue"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h3"/></svg></span><span class="arrow">→</span></div>
+          <div class="tile-name">다가오는 청약</div>
+          <div class="tile-body"></div>
+        </a>
+      </div>
+
+      <div class="sec-head">
+        <h2>투자 이슈 <span class="muted small">시장을 읽는 또 하나의 시선</span></h2>
+        <div class="seg" id="news-periods" role="group" aria-label="뉴스 기간">
+          <button type="button" data-period="day">오늘</button>
+          <button type="button" data-period="week">이번 주</button>
+          <button type="button" data-period="month">이번 달</button>
+        </div>
+      </div>
+      <div class="news-grid">
+        <article class="panel news-card">
+          <div class="news-head">
+            <span class="src-badge naver">N</span><h3>네이버 뉴스</h3><span class="muted small">국내시장</span>
+            <a class="ext" href="https://search.naver.com/search.naver?where=news&amp;query=%EA%B2%BD%EC%A0%9C" target="_blank" rel="noopener noreferrer">뉴스 검색 ↗</a>
+          </div>
+          <ol id="news-naver" class="news-list"></ol>
+        </article>
+        <article class="panel news-card">
+          <div class="news-head">
+            <span class="src-badge google">G</span><h3>구글 뉴스</h3><span class="muted small">해외시장</span>
+            <a class="ext" href="https://news.google.com/search?q=stock%20market&amp;hl=en-US" target="_blank" rel="noopener noreferrer">뉴스 검색 ↗</a>
+          </div>
+          <ol id="news-google" class="news-list"></ol>
+        </article>
       </div>
     </section>
 
@@ -384,6 +435,18 @@
 
   </main>
 </div>
+
+<!-- 뉴스 바로 보기 -->
+<dialog id="news-reader" class="reader" aria-labelledby="nr-title">
+  <div class="reader-head">
+    <span id="nr-meta" class="reader-meta"></span>
+    <div class="actions">
+      <a id="nr-open" class="btn ghost" target="_blank" rel="noopener noreferrer">원문 보기 ↗</a>
+      <button type="button" id="nr-close" class="icon-btn" aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+  </div>
+  <div class="reader-body" id="nr-body"></div>
+</dialog>
 
 <!-- 청약 공고 원문 보기 (청약홈/LH 페이지를 이 안에 띄움) -->
 <dialog id="sub-viewer" class="viewer">

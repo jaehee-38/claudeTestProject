@@ -319,3 +319,15 @@ dialog.viewer iframe { flex: 1; width: 100%; border: 0; background: #fff; }
 .fxc-tip td.up { color: var(--up); } .fxc-tip td.down { color: var(--down); }
 .gc-dot { stroke: var(--surface); stroke-width: 2; pointer-events: none; }
 #gc-note { margin-top: 4px; }
+
+/* ---------- 홈: 투자 이슈 ---------- */
+#d-news { min-height: 0; }
+.news-periods button { padding: 4px 10px; }
+.news-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px 28px; }
+.news-col h3 { font-size: .85rem; margin: 2px 0 6px; }
+.news-list { list-style: none; margin: 0; padding: 0; }
+.news-list li { display: flex; flex-direction: column; gap: 2px; padding: 7px 0; border-top: 1px solid var(--border); }
+.news-list li:first-child { border-top: 0; }
+.news-t { color: var(--text); text-decoration: none; font-size: 13.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+a.news-t:hover { color: var(--accent); }
+.news-m { font-size: 11.5px; color: var(--text-sub); }

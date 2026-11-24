@@ -177,6 +177,7 @@ async function loadStatus() {
     ['공공데이터포털', status.dataGoKr],
     ['수출입은행', status.koreaexim],
     [`한국투자증권${status.kisMock ? '(모의)' : ''}`, status.kis],
+    ['네이버', status.naver],
   ];
   $('#key-status').innerHTML = items
     .map(([n, on]) => `<span class="key ${on ? 'on' : 'off'}" title="${on ? '키 설정됨' : '.env 에 키 없음'}">${esc(n)}</span>`)
@@ -194,6 +195,7 @@ const FX_MAIN = ['USD', 'JPY', 'EUR', 'CNH', 'GBP'];
 const DASH_STOCKS = 5;
 
 function renderHome() {
+  dashNews();
   dashPortfolio();
   dashGold();
   dashExchange();
@@ -239,6 +241,62 @@ async function dashPortfolio() {
     body.innerHTML = cardError(e);
   }
 }
+
+// ---------------------------------------------------------------------
+// 투자 이슈 (국내: 네이버, 해외: Google 뉴스)
+// ---------------------------------------------------------------------
+
+let newsPeriod = store.get('newsPeriod', 'day');
+
+data.news = (source, period) => cached(`news:${source}:${period}`,
+  () => api(`/api/news?source=${source}&period=${period}`), 10 * 60_000);
+
+/** "2026-11-24T16:35+09:00" → "3시간 전" / "어제" / "11.18" */
+function timeAgo(iso) {
+  if (!iso) return '';
+  const t = new Date(iso);
+  const min = Math.round((Date.now() - t) / 60_000);
+  if (min < 1) return '방금';
+  if (min < 60) return `${min}분 전`;
+  if (min < 24 * 60) return `${Math.floor(min / 60)}시간 전`;
+  if (min < 48 * 60) return '어제';
+  if (min < 7 * 24 * 60) return `${Math.floor(min / 1440)}일 전`;
+  return `${t.getMonth() + 1}.${String(t.getDate()).padStart(2, '0')}`;
+}
+
+async function loadNewsCol(source, el) {
+  el.innerHTML = Array.from({ length: 4 }, () => `<li>${skeleton('md', 'sm')}</li>`).join('');
+  try {
+    const items = await data.news(source, newsPeriod);
+    if (!items.length) { el.innerHTML = '<li class="derr">이 기간의 기사가 없습니다.</li>'; return; }
+    el.innerHTML = items.slice(0, 6).map((n) => {
+      const url = /^https?:\/\//.test(n.url || '') ? n.url : null;
+      return `<li>
+        ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="news-t">${esc(n.title)}</a>` : `<span class="news-t">${esc(n.title)}</span>`}
+        <span class="news-m">${esc(n.press || '')}${n.press && n.publishedAt ? ' · ' : ''}${esc(timeAgo(n.publishedAt))}</span>
+      </li>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = `<li>${cardError(e)}</li>`;
+  }
+}
+
+function dashNews() {
+  document.querySelectorAll('#news-periods button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.period === newsPeriod);
+    b.setAttribute('aria-pressed', b.dataset.period === newsPeriod);
+  });
+  loadNewsCol('naver', $('#news-naver'));
+  loadNewsCol('google', $('#news-google'));
+}
+
+$('#news-periods').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-period]');
+  if (!b || b.dataset.period === newsPeriod) return;
+  newsPeriod = b.dataset.period;
+  store.set('newsPeriod', newsPeriod);
+  dashNews();
+});
 
 async function dashGold() {
   const body = $('#d-gold .dcard-body');

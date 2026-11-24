@@ -46,6 +46,26 @@
           <div class="dcard-head"><h2>내 투자</h2><span class="more">자세히 →</span></div>
           <div class="dcard-body"></div>
         </a>
+        <div class="dcard wide" id="d-news">
+          <div class="dcard-head">
+            <h2>투자 이슈</h2>
+            <div class="fxc-ranges news-periods" id="news-periods" role="group" aria-label="기간">
+              <button type="button" data-period="day">오늘</button>
+              <button type="button" data-period="week">이번 주</button>
+              <button type="button" data-period="month">이번 달</button>
+            </div>
+          </div>
+          <div class="news-cols">
+            <section class="news-col">
+              <h3>국내 <span class="muted small">네이버</span></h3>
+              <ol id="news-naver" class="news-list"></ol>
+            </section>
+            <section class="news-col">
+              <h3>해외 <span class="muted small">Google 뉴스</span></h3>
+              <ol id="news-google" class="news-list"></ol>
+            </section>
+          </div>
+        </div>
         <a class="dcard" href="#/gold" id="d-gold">
           <div class="dcard-head"><h2>금 시세</h2><span class="more">자세히 →</span></div>
           <div class="dcard-body"></div>

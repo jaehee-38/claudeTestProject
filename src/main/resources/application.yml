@@ -78,6 +78,19 @@ invest:
   # 환율 그래프용 과거 환율. 유럽중앙은행(ECB) 기준환율, 영업일 하루 1번 갱신, 키 필요 없음
   frankfurter:
     url: ${FRANKFURTER_URL:https://api.frankfurter.dev/v1}
+  # 뉴스 (홈 화면 투자 이슈)
+  naver:
+    client-id: ${NAVER_CLIENT_ID:}
+    client-secret: ${NAVER_CLIENT_SECRET:}
+    # NAVER API HUB (네이버 클라우드). 2026-07-31 부터 개발자센터의 검색 API 신규 등록이 막혀 이쪽으로 옮겨졌습니다.
+    # 예전 개발자센터 키가 있다면 https://openapi.naver.com/v1/search/news.json 로 바꾸면 그대로 동작 (2027-06-30 까지)
+    news-url: ${NAVER_NEWS_URL:https://naverapihub.apigw.ntruss.com/search/v1/news}
+  google-news:
+    url: ${GOOGLE_NEWS_URL:https://news.google.com/rss/search}
+    # 미국판 영어 기사. 한국어판은 hl=ko, gl=KR, ceid=KR:ko
+    hl: ${GOOGLE_NEWS_HL:en-US}
+    gl: ${GOOGLE_NEWS_GL:US}
+    ceid: ${GOOGLE_NEWS_CEID:US:en}
   kis:
     app-key: ${KIS_APP_KEY:}
     app-secret: ${KIS_APP_SECRET:}

@@ -7,11 +7,13 @@ import com.example.firstproject.dto.FxHistoryDto;
 import com.example.firstproject.dto.GoldHistoryDto;
 import com.example.firstproject.dto.GoldPriceDto;
 import com.example.firstproject.dto.KisBalanceDto;
+import com.example.firstproject.dto.NewsItemDto;
 import com.example.firstproject.dto.StockQuoteDto;
 import com.example.firstproject.dto.SubscriptionListRes;
 import com.example.firstproject.service.ExchangeService;
 import com.example.firstproject.service.FxHistoryService;
 import com.example.firstproject.service.GoldService;
+import com.example.firstproject.service.NewsService;
 import com.example.firstproject.service.RealEstateService;
 import com.example.firstproject.service.StockService;
 import com.example.firstproject.service.SubscriptionService;
@@ -39,6 +41,7 @@ public class MarketController {
     private final StockService stockService;
     private final RealEstateService realEstateService;
     private final SubscriptionService subscriptionService;
+    private final NewsService newsService;
 
     /** 어떤 API 키가 설정됐는지 (키 값은 내려주지 않음) */
     @GetMapping("/status")
@@ -48,7 +51,8 @@ public class MarketController {
                 "koreaexim", props.koreaexim().configured(),
                 "kis", props.kis().configured(),
                 "kisAccount", props.kis().accountConfigured(),
-                "kisMock", props.kis().mock());
+                "kisMock", props.kis().mock(),
+                "naver", props.naver().configured());
     }
 
     // GET /api/gold?days=30
@@ -91,6 +95,14 @@ public class MarketController {
     @GetMapping("/real-estate/apt-trades")
     public List<AptTradeDto> aptTrades(@RequestParam String lawdCd, @RequestParam String dealYm) {
         return realEstateService.aptTrades(lawdCd, dealYm);
+    }
+
+    // GET /api/news?source=naver|google&period=day|week|month&topic=all  (홈 화면 투자 이슈)
+    @GetMapping("/news")
+    public List<NewsItemDto> news(@RequestParam String source,
+                                  @RequestParam(defaultValue = "day") String period,
+                                  @RequestParam(defaultValue = "all") String topic) {
+        return newsService.news(source, period, topic);
     }
 
     // GET /api/subscriptions  (청약홈 + LH 청약 공고, 최근 60일)

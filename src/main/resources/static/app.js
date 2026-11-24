@@ -218,6 +218,7 @@ async function loadStatus() {
 
 const TYPE_ORDER = ['STOCK', 'GOLD', 'CURRENCY', 'REAL_ESTATE', 'ETC'];
 const ALLOC_COLORS = { STOCK: 'var(--alloc-1)', GOLD: 'var(--alloc-2)', CURRENCY: 'var(--alloc-3)', REAL_ESTATE: 'var(--alloc-4)', ETC: 'var(--alloc-5)' };
+const FX_MAIN = ['USD', 'JPY', 'EUR', 'CNH', 'GBP']; // 환율 표에서 위로 올릴 주요 통화
 const DASH_HOLDINGS = 4;
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 

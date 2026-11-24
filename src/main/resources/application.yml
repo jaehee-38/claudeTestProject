@@ -91,6 +91,9 @@ invest:
     hl: ${GOOGLE_NEWS_HL:en-US}
     gl: ${GOOGLE_NEWS_GL:US}
     ceid: ${GOOGLE_NEWS_CEID:US:en}
+  # 해외 뉴스 제목 한국어 번역. 키 필요 없음. 빈 값으로 두면 번역 끔
+  translate:
+    url: ${TRANSLATE_URL:https://translate.googleapis.com/translate_a/single}
   kis:
     app-key: ${KIS_APP_KEY:}
     app-secret: ${KIS_APP_SECRET:}

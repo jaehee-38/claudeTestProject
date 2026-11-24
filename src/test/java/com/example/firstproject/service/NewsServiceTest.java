@@ -61,4 +61,13 @@ class NewsServiceTest {
                 {"errorCode":"SE02","errorMessage":"Invalid display value"}""")))
                 .isEqualTo("Invalid display value [SE02]");
     }
+
+    @Test
+    void parseTranslation_joinsSegmentsAndSplitsLines() throws Exception {
+        var root = new ObjectMapper().readTree("""
+                [[["연준 신호에 주가 상승. ","Stocks rally. ",null],["투자자 환호\\n","Investors cheer.\\n",null],
+                  ["금값 사상 최고","Gold hits record",null]],null,"en"]""");
+
+        assertThat(NewsService.parseTranslation(root)).containsExactly("연준 신호에 주가 상승. 투자자 환호", "금값 사상 최고");
+    }
 }

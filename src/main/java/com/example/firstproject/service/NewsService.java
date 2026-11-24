@@ -184,7 +184,43 @@ public class NewsService {
             if (out.size() >= LIMIT) break;
             if (seen.add(titleKey(item.title()))) out.add(item);
         }
-        return out;
+        return translateTitles(out);
+    }
+
+    /** 영어 제목들을 한 번에 한국어로 번역 (줄바꿈으로 이어 보내고 다시 나눔). 실패하면 원문만 둠 */
+    private List<NewsItemDto> translateTitles(List<NewsItemDto> items) {
+        InvestProperties.Translate cfg = props.translate();
+        if (items.isEmpty() || cfg == null || !cfg.enabled()) return items;
+        try {
+            String joined = String.join("\n", items.stream().map(i -> i.title().replace('\n', ' ')).toList());
+            URI uri = UriComponentsBuilder.fromHttpUrl(cfg.url())
+                    .queryParam("client", "gtx")
+                    .queryParam("sl", "auto")
+                    .queryParam("tl", "ko")
+                    .queryParam("dt", "t")
+                    .queryParam("q", joined)
+                    .encode()
+                    .build()
+                    .toUri();
+            String body = restClient.get().uri(uri).retrieve().body(String.class);
+            List<String> ko = parseTranslation(objectMapper.readTree(body == null ? "" : body));
+            if (ko.size() != items.size()) return items;
+            List<NewsItemDto> out = new ArrayList<>(items.size());
+            for (int i = 0; i < items.size(); i++) {
+                String t = ko.get(i).trim();
+                out.add(t.isEmpty() || t.equals(items.get(i).title()) ? items.get(i) : items.get(i).withTitleKo(t));
+            }
+            return out;
+        } catch (Exception e) {
+            return items;
+        }
+    }
+
+    /** [[["번역1\n","원문1\n",…],["번역2","원문2",…]],…] → 번역문을 이어 붙여 줄 단위로 */
+    static List<String> parseTranslation(JsonNode root) {
+        StringBuilder sb = new StringBuilder();
+        for (JsonNode seg : root.path(0)) sb.append(seg.path(0).asText(""));
+        return List.of(sb.toString().split("\n", -1));
     }
 
     private byte[] googleGet(URI uri) {

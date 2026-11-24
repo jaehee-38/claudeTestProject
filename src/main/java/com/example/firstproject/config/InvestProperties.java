@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "invest")
 public record InvestProperties(DataGoKr dataGoKr, Koreaexim koreaexim, Kis kis, Frankfurter frankfurter,
-                               Naver naver, GoogleNews googleNews) {
+                               Naver naver, GoogleNews googleNews, Translate translate) {
 
     public record DataGoKr(String serviceKey, String goldUrl, String aptTradeUrl,
                            String applyhomeUrl, String lhNoticeUrl) {
@@ -34,6 +34,13 @@ public record InvestProperties(DataGoKr dataGoKr, Koreaexim koreaexim, Kis kis, 
 
     /** 해외 뉴스: Google 뉴스 RSS (키 불필요, 개인·비상업적 용도) */
     public record GoogleNews(String url, String hl, String gl, String ceid) {}
+
+    /** 해외 뉴스 제목 번역 (Google 번역 공개 엔드포인트, 키 불필요). url 을 비우면 번역 안 함 */
+    public record Translate(String url) {
+        public boolean enabled() {
+            return hasText(url);
+        }
+    }
 
     public record Kis(String appKey, String appSecret, String accountNo, boolean mock,
                       String baseUrl, String tokenCacheFile) {

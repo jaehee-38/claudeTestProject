@@ -273,6 +273,7 @@ async function loadNewsCol(source, el) {
       const url = /^https?:\/\//.test(n.url || '') ? n.url : null;
       return `<li>
         ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="news-t">${esc(n.title)}</a>` : `<span class="news-t">${esc(n.title)}</span>`}
+        ${n.titleKo ? `<span class="news-ko">${esc(n.titleKo)}</span>` : ''}
         <span class="news-m">${esc(n.press || '')}${n.press && n.publishedAt ? ' · ' : ''}${esc(timeAgo(n.publishedAt))}</span>
       </li>`;
     }).join('');

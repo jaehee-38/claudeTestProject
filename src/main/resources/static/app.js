@@ -1016,7 +1016,7 @@ function drawSubscriptions() {
   tbody.innerHTML = rows.map((n) => {
     const safeUrl = /^https?:\/\//.test(n.url || '') ? n.url : null;
     const title = safeUrl
-      ? `<a class="lnk" href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">${esc(n.name)}</a>`
+      ? `<a class="lnk sub-open" href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">${esc(n.name)}</a>`
       : esc(n.name);
     return `
     <tr class="${subGroup(n.status) === 'closed' ? 'dim' : ''}">
@@ -1032,6 +1032,33 @@ function drawSubscriptions() {
     </tr>`;
   }).join('');
 }
+
+// 공고명 클릭 → 새 탭 대신 내 페이지 안에서 원문 보기
+// (Ctrl/Cmd/가운데 클릭은 원래대로 새 탭)
+$('#sub-rows').addEventListener('click', (e) => {
+  const a = e.target.closest('a.sub-open');
+  if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+  e.preventDefault();
+  openSubViewer(a.href, a.textContent);
+});
+
+function openSubViewer(url, title) {
+  $('#sub-viewer-title').textContent = title;
+  $('#sub-viewer-open').href = url;
+  $('#sub-viewer-frame').src = url;
+  $('#sub-viewer').showModal();
+}
+
+function closeSubViewer() {
+  $('#sub-viewer').close();
+}
+
+$('#sub-viewer-close').addEventListener('click', closeSubViewer);
+$('#sub-viewer-open').addEventListener('click', closeSubViewer);
+// 바깥(어두운 배경) 클릭으로 닫기
+$('#sub-viewer').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeSubViewer(); });
+// 닫을 때 페이지를 비워서 뒤에서 계속 돌지 않게
+$('#sub-viewer').addEventListener('close', () => { $('#sub-viewer-frame').src = 'about:blank'; });
 
 $('#sub-form').addEventListener('submit', (e) => e.preventDefault());
 ['#sub-source', '#sub-status', '#sub-region'].forEach((s) => $(s).addEventListener('change', drawSubscriptions));

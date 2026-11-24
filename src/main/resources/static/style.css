@@ -267,3 +267,13 @@ a.dcard:hover, .dcard:has(.dcard-head a:hover) { border-color: color-mix(in srgb
 .st-open { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .st-soon { background: color-mix(in srgb, var(--up) 14%, transparent); color: var(--up); }
 .data tr.dim td { color: var(--text-sub); }
+
+/* 청약 공고 원문 보기 */
+dialog.viewer { width: min(1100px, calc(100vw - 32px)); height: min(860px, calc(100vh - 48px)); display: none; flex-direction: column; }
+dialog.viewer[open] { display: flex; }
+.viewer-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.viewer-head h3 { margin: 0; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-head .actions { display: flex; gap: 8px; flex-shrink: 0; }
+.viewer-head a.btn { text-decoration: none; }
+dialog.viewer iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+.viewer-foot { margin: 0; padding: 8px 16px; border-top: 1px solid var(--border); }

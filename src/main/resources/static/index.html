@@ -306,6 +306,21 @@
   </main>
 </div>
 
+<!-- 청약 공고 원문 보기 (청약홈/LH 페이지를 이 안에 띄움) -->
+<dialog id="sub-viewer" class="viewer">
+  <div class="viewer-head">
+    <h3 id="sub-viewer-title"></h3>
+    <div class="actions">
+      <a id="sub-viewer-open" class="btn ghost" target="_blank" rel="noopener noreferrer">새 창에서 열기 ↗</a>
+      <button type="button" id="sub-viewer-close" class="btn ghost" aria-label="닫기">닫기 ✕</button>
+    </div>
+  </div>
+  <iframe id="sub-viewer-frame" title="청약 공고 원문"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+          referrerpolicy="no-referrer"></iframe>
+  <p class="viewer-foot muted small">화면이 비어 있거나 로그인이 필요하다고 나오면 "새 창에서 열기"를 눌러주세요. 청약 신청은 새 창에서 해야 합니다.</p>
+</dialog>
+
 <!-- 계좌 개설 -->
 <dialog id="inv-acct-dialog">
   <form id="inv-acct-form" method="dialog">

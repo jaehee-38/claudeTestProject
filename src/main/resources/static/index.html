@@ -146,6 +146,36 @@
         <h2>환율 <span id="fx-date" class="muted small"></span></h2>
         <button id="fx-refresh" class="btn ghost">새로고침</button>
       </div>
+
+      <div class="fxc-card">
+        <div class="fxc-head">
+          <h3 id="fxc-title">원화 환율 추이</h3>
+          <div class="fxc-ranges" id="fxc-ranges" role="group" aria-label="기간">
+            <button type="button" data-range="7d">1주</button>
+            <button type="button" data-range="1m">1개월</button>
+            <button type="button" data-range="3m">3개월</button>
+            <button type="button" data-range="6m">6개월</button>
+            <button type="button" data-range="1y">1년</button>
+            <button type="button" data-range="3y">3년</button>
+            <button type="button" data-range="5y">5년</button>
+            <button type="button" data-range="10y">10년</button>
+            <button type="button" data-range="custom">직접 설정</button>
+          </div>
+        </div>
+        <form id="fxc-custom" class="fxc-custom" hidden>
+          <input id="fxc-from" type="date" required aria-label="시작일">
+          <span>~</span>
+          <input id="fxc-to" type="date" required aria-label="종료일">
+          <button class="btn primary">적용</button>
+        </form>
+        <div id="fxc-legend" class="fxc-legend"></div>
+        <div id="fxc-wrap" class="fxc-wrap">
+          <svg id="fxc-svg" role="img" aria-label="미국·중국·일본·유럽 통화의 기간 시작 대비 원화 환율 변동률 그래프"></svg>
+          <div id="fxc-tip" class="fxc-tip" hidden></div>
+        </div>
+        <div id="fxc-msg" class="msg" hidden></div>
+      </div>
+
       <div class="fx-tools">
         <input id="fx-search" placeholder="통화 검색 (USD, 엔, 유로…)" autocomplete="off">
         <div class="converter">

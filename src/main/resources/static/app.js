@@ -765,6 +765,7 @@ $('#gold-refresh').addEventListener('click', () => { invalidate('gold'); renderG
 let fx = null;
 
 async function renderExchangeView() {
+  loadFxChart();
   const tbody = $('#fx-rows');
   emptyRow(tbody, 5, '불러오는 중…');
   showMsg($('#fx-msg'), '');
@@ -813,7 +814,334 @@ function convert() {
 $('#fx-search').addEventListener('input', drawFx);
 $('#fx-amount').addEventListener('input', convert);
 $('#fx-cur').addEventListener('change', convert);
-$('#fx-refresh').addEventListener('click', () => { invalidate('exchange'); renderExchangeView(); });
+$('#fx-refresh').addEventListener('click', () => { invalidate('exchange', 'fxh:'); renderExchangeView(); });
+
+// ---------------------------------------------------------------------
+// 환율 그래프 (미국·중국·일본·유럽, 기간 시작 대비 변동률)
+//  - 통화마다 원화 환율 크기가 달라서(달러 약 1,400원, 위안 약 190원) 변동률(%)로 맞춰 한 축에 그립니다.
+//  - 색만으로 구별하지 않도록 선 끝에 나라 이름도 표시합니다.
+// ---------------------------------------------------------------------
+
+const FXC_RANGES = {
+  '7d': (d) => d.setDate(d.getDate() - 7),
+  '1m': (d) => d.setMonth(d.getMonth() - 1),
+  '3m': (d) => d.setMonth(d.getMonth() - 3),
+  '6m': (d) => d.setMonth(d.getMonth() - 6),
+  '1y': (d) => d.setFullYear(d.getFullYear() - 1),
+  '3y': (d) => d.setFullYear(d.getFullYear() - 3),
+  '5y': (d) => d.setFullYear(d.getFullYear() - 5),
+  '10y': (d) => d.setFullYear(d.getFullYear() - 10),
+};
+
+const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const fxc = {
+  range: store.get('fxcRange', '3m'),
+  data: null,
+  hidden: new Set(store.get('fxcHidden', [])),
+  hover: null,      // 강조 중인 통화코드
+  geom: null,       // 마지막으로 그린 좌표 정보 (마우스 처리용)
+};
+
+data.fxHistory = (from, to) => cached(`fxh:${from}:${to}`,
+  () => api(`/api/exchange/history?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`), 10 * 60_000);
+
+function fxcPeriod() {
+  if (fxc.range === 'custom') return { from: $('#fxc-from').value, to: $('#fxc-to').value };
+  const d = new Date();
+  (FXC_RANGES[fxc.range] || FXC_RANGES['3m'])(d);
+  return { from: isoDate(d), to: isoDate(new Date()) };
+}
+
+function fxcSyncControls() {
+  document.querySelectorAll('#fxc-ranges button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.range === fxc.range);
+    b.setAttribute('aria-pressed', b.dataset.range === fxc.range);
+  });
+  $('#fxc-custom').hidden = fxc.range !== 'custom';
+}
+
+async function loadFxChart() {
+  fxcSyncControls();
+  const { from, to } = fxcPeriod();
+  if (!from || !to) return;
+  showMsg($('#fxc-msg'), '');
+  $('#fxc-wrap').classList.add('loading');
+  try {
+    fxc.data = await data.fxHistory(from, to);
+    if (fxc.data.dates.length < 2) {
+      fxc.data = null;
+      $('#fxc-svg').innerHTML = '';
+      showMsg($('#fxc-msg'), '이 기간에는 영업일 데이터가 2일 미만이라 그래프를 그릴 수 없습니다. 기간을 넓혀 주세요.', 'info');
+      return;
+    }
+    // 출처·기간은 화면에 늘 띄우지 않고 제목에 마우스를 올렸을 때만
+    $('#fxc-title').title = `${fxc.data.start} ~ ${fxc.data.end} · ${fxc.data.source} · 영업일 하루 1번 갱신`;
+    drawFxLegend();
+    drawFxChart();
+  } catch (e) {
+    fxc.data = null;
+    $('#fxc-svg').innerHTML = '';
+    showMsg($('#fxc-msg'), e.message);
+  } finally {
+    $('#fxc-wrap').classList.remove('loading');
+  }
+}
+
+/** 통화 i 의 색/선 모양 (색은 통화에 고정 — 숨겨도 다른 통화 색이 바뀌지 않음) */
+function fxcStyle(i) {
+  return { color: `var(--s${(i % 8) + 1})`, dash: i >= 8 ? '6 4' : '' };
+}
+
+/** 각 통화의 기간 시작 대비 변동률(%) */
+function fxcSeries() {
+  const { currencies, series } = fxc.data;
+  return currencies.map((c, i) => {
+    const raw = series[c.code] || [];
+    const base = raw.find((v) => v != null);
+    const pct = raw.map((v) => (v == null || !base ? null : (v / base - 1) * 100));
+    let last = raw.length - 1;
+    while (last >= 0 && raw[last] == null) last--;
+    return { ...c, i, raw, base, pct, last, ...fxcStyle(i) };
+  });
+}
+
+function drawFxLegend() {
+  const list = fxcSeries();
+  $('#fxc-legend').innerHTML = list.map((s) => `
+    <button type="button" class="fxc-chip ${fxc.hidden.has(s.code) ? 'off' : ''}" data-code="${esc(s.code)}"
+            aria-pressed="${!fxc.hidden.has(s.code)}" title="눌러서 숨기기/보이기">
+      <svg width="18" height="8" aria-hidden="true"><line x1="1" y1="4" x2="17" y2="4" stroke="${s.color}" stroke-width="2.5"
+        ${s.dash ? 'stroke-dasharray="4 3"' : ''} stroke-linecap="round"/></svg>
+      ${esc(s.country)} <span class="muted">${esc(s.code)}</span>
+    </button>`).join('');
+}
+
+/** 보기 좋은 눈금 (1, 2, 5 × 10^n 간격) */
+function niceTicks(min, max, count = 5) {
+  const span = max - min || 1;
+  const raw = span / count;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw) || 10 * mag;
+  const ticks = [];
+  for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-9; v += step) ticks.push(+v.toFixed(10));
+  return { ticks, step };
+}
+
+function drawFxChart() {
+  if (!fxc.data) return;
+  const svg = $('#fxc-svg');
+  const W = $('#fxc-wrap').clientWidth || 800;
+  const narrow = W < 560;
+  const H = narrow ? 300 : 380;
+  const M = { l: 52, r: narrow ? 76 : 104, t: 14, b: 30 };
+  const pw = W - M.l - M.r, ph = H - M.t - M.b;
+  const { dates } = fxc.data;
+  const n = dates.length;
+
+  const list = fxcSeries();
+  const shown = list.filter((s) => !fxc.hidden.has(s.code));
+
+  let min = 0, max = 0;
+  shown.forEach((s) => s.pct.forEach((v) => { if (v != null) { min = Math.min(min, v); max = Math.max(max, v); } }));
+  const pad = (max - min) * 0.08 || 1;
+  const { ticks } = niceTicks(min - pad, max + pad);
+  const y0 = Math.min(ticks[0], min - pad), y1 = Math.max(ticks[ticks.length - 1], max + pad);
+
+  const x = (i) => M.l + (n === 1 ? pw / 2 : (i / (n - 1)) * pw);
+  const y = (v) => M.t + (1 - (v - y0) / (y1 - y0)) * ph;
+  const fmtPct = (v) => (v > 0 ? '+' : '') + nf2.format(v) + '%';
+
+  // 세로 눈금 + 격자
+  const grid = ticks.map((t) => `
+    <line class="fxc-grid ${t === 0 ? 'zero' : ''}" x1="${M.l}" x2="${M.l + pw}" y1="${y(t)}" y2="${y(t)}"/>
+    <text class="fxc-axis" x="${M.l - 8}" y="${y(t)}" text-anchor="end" dominant-baseline="middle">${t > 0 ? '+' : ''}${nf2.format(t)}%</text>`).join('');
+
+  // 가로 날짜 눈금 (5~6개)
+  const long = (new Date(dates[n - 1]) - new Date(dates[0])) / 864e5 > 400;
+  const fmtX = (d) => (long ? `${d.slice(2, 4)}.${d.slice(5, 7)}` : `${d.slice(5, 7)}.${d.slice(8, 10)}`);
+  const xCount = narrow ? 4 : 6;
+  const xIdx = [...new Set(Array.from({ length: xCount }, (_, k) => Math.round((k / (xCount - 1)) * (n - 1))))];
+  const xAxis = xIdx.map((i, k) => `
+    <text class="fxc-axis" x="${x(i)}" y="${H - 8}" text-anchor="${k === 0 ? 'start' : k === xIdx.length - 1 ? 'end' : 'middle'}">${fmtX(dates[i])}</text>`).join('');
+
+  // 선
+  const lines = shown.map((s) => {
+    let d = '', pen = false;
+    s.pct.forEach((v, i) => {
+      if (v == null) { pen = false; return; }
+      d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+      pen = true;
+    });
+    return `<path class="fxc-line" data-code="${esc(s.code)}" d="${d}" stroke="${s.color}" ${s.dash ? `stroke-dasharray="${s.dash}"` : ''}/>`;
+  }).join('');
+
+  // 선 끝 이름표 (겹치지 않게 위아래로 밀어냄)
+  const GAP = 13;
+  const labels = shown.filter((s) => s.last >= 0)
+    .map((s) => ({ s, want: y(s.pct[s.last]) }))
+    .sort((a, b) => a.want - b.want);
+  labels.forEach((l, k) => { l.at = Math.max(l.want, k ? labels[k - 1].at + GAP : M.t); });
+  for (let k = labels.length - 1; k >= 0; k--) {
+    const limit = k === labels.length - 1 ? M.t + ph : labels[k + 1].at - GAP;
+    labels[k].at = Math.min(labels[k].at, limit);
+  }
+  const ends = labels.map(({ s, want, at }) => `
+    <g class="fxc-end" data-code="${esc(s.code)}">
+      <line x1="${x(s.last) + 3}" y1="${want}" x2="${M.l + pw + 8}" y2="${at}" stroke="${s.color}" stroke-width="1" opacity=".5"/>
+      <circle cx="${x(s.last)}" cy="${want}" r="3" fill="${s.color}"/>
+      <text class="fxc-endtxt" x="${M.l + pw + 11}" y="${at}" dominant-baseline="middle">${esc(s.country)} <tspan class="fxc-endval">${fmtPct(s.pct[s.last])}</tspan></text>
+    </g>`).join('');
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+  svg.innerHTML = `
+    <g>${grid}</g>${xAxis}
+    <g class="fxc-lines">${lines}</g>
+    <g>${ends}</g>
+    <line id="fxc-cross" class="fxc-cross" y1="${M.t}" y2="${M.t + ph}" visibility="hidden"/>
+    <circle id="fxc-dot" r="5" visibility="hidden"/>
+    <rect id="fxc-hit" x="${M.l}" y="${M.t}" width="${pw}" height="${ph}" fill="transparent"/>`;
+
+  fxc.geom = { M, pw, ph, n, x, y, shown, fmtPct };
+  fxcApplyHover();
+}
+
+/** 강조 중인 선은 두껍게, 나머지는 흐리게 */
+function fxcApplyHover() {
+  const code = fxc.hover;
+  document.querySelectorAll('#fxc-svg .fxc-line, #fxc-svg .fxc-end').forEach((el) => {
+    el.classList.toggle('on', el.dataset.code === code);
+    el.classList.toggle('dim', code != null && el.dataset.code !== code);
+  });
+  document.querySelectorAll('#fxc-legend .fxc-chip').forEach((el) => el.classList.toggle('hl', el.dataset.code === code));
+  // 강조한 선을 맨 위로
+  if (code) {
+    const el = document.querySelector(`#fxc-svg .fxc-line[data-code="${CSS.escape(code)}"]`);
+    if (el) el.parentNode.appendChild(el);
+  }
+}
+
+function fxcHideTip() {
+  fxc.hover = null;
+  $('#fxc-tip').hidden = true;
+  $('#fxc-cross')?.setAttribute('visibility', 'hidden');
+  $('#fxc-dot')?.setAttribute('visibility', 'hidden');
+  fxcApplyHover();
+}
+
+function fxcOnMove(ev) {
+  const g = fxc.geom;
+  if (!g || !g.shown.length) return;
+  const svg = $('#fxc-svg');
+  const r = svg.getBoundingClientRect();
+  const mx = (ev.clientX - r.left) * (svg.viewBox.baseVal.width / r.width);
+  const my = (ev.clientY - r.top) * (svg.viewBox.baseVal.height / r.height);
+  const i = Math.max(0, Math.min(g.n - 1, Math.round(((mx - g.M.l) / g.pw) * (g.n - 1))));
+
+  // 마우스와 세로로 가장 가까운 선
+  let best = null;
+  g.shown.forEach((s) => {
+    const v = s.pct[i];
+    if (v == null) return;
+    const dist = Math.abs(g.y(v) - my);
+    if (!best || dist < best.dist) best = { s, v, dist };
+  });
+  if (!best) return;
+  const { s, v } = best;
+
+  fxc.hover = s.code;
+  fxcApplyHover();
+  const cx = g.x(i), cy = g.y(v);
+  const cross = $('#fxc-cross');
+  cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.setAttribute('visibility', 'visible');
+  const dot = $('#fxc-dot');
+  dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('fill', s.color); dot.setAttribute('visibility', 'visible');
+
+  const valid = s.raw.filter((x) => x != null);
+  const hi = Math.max(...valid), lo = Math.min(...valid);
+  const rate = s.raw[i];
+  const diff = rate - s.base;
+  const unit = s.unit === 1 ? `1${s.name}` : `${s.unit}${s.name}`;
+  const tip = $('#fxc-tip');
+  tip.innerHTML = `
+    <div class="fxc-tip-h"><svg width="18" height="8" aria-hidden="true"><line x1="1" y1="4" x2="17" y2="4" stroke="${s.color}" stroke-width="3" ${s.dash ? 'stroke-dasharray="4 3"' : ''}/></svg>
+      <b>${esc(s.country)} ${esc(s.name)}</b> <span class="muted">${esc(s.code)}</span></div>
+    <div class="muted small">${esc(fxc.data.dates[i])}</div>
+    <div class="fxc-tip-big">${nf2.format(rate)}원 <span class="muted small">/ ${esc(unit)}</span></div>
+    <table>
+      <tr><td>기간 시작 대비</td><td class="${signCls(diff)}">${signed(diff, nf2)}원 (${g.fmtPct(v)})</td></tr>
+      <tr><td>기간 최고</td><td>${nf2.format(hi)}원</td></tr>
+      <tr><td>기간 최저</td><td>${nf2.format(lo)}원</td></tr>
+    </table>`;
+  tip.hidden = false;
+
+  // 말풍선은 커서 오른쪽, 넘치면 왼쪽
+  const wrap = $('#fxc-wrap').getBoundingClientRect();
+  const px = cx * (r.width / svg.viewBox.baseVal.width) + (r.left - wrap.left);
+  const py = cy * (r.height / svg.viewBox.baseVal.height) + (r.top - wrap.top);
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  let left = px + 14;
+  if (left + tw > wrap.width) left = px - tw - 14;
+  tip.style.left = `${Math.max(0, left)}px`;
+  tip.style.top = `${Math.max(0, Math.min(wrap.height - th, py - th / 2))}px`;
+}
+
+$('#fxc-wrap').addEventListener('pointermove', (e) => { if (e.target.closest('#fxc-svg')) fxcOnMove(e); });
+$('#fxc-wrap').addEventListener('pointerleave', fxcHideTip);
+
+$('#fxc-legend').addEventListener('click', (e) => {
+  const chip = e.target.closest('.fxc-chip');
+  if (!chip) return;
+  const code = chip.dataset.code;
+  if (fxc.hidden.has(code)) fxc.hidden.delete(code); else fxc.hidden.add(code);
+  if (fxc.hidden.size === fxc.data?.currencies.length) fxc.hidden.delete(code); // 하나는 남겨둠
+  store.set('fxcHidden', [...fxc.hidden]);
+  drawFxLegend();
+  drawFxChart();
+});
+$('#fxc-legend').addEventListener('pointerover', (e) => {
+  const chip = e.target.closest('.fxc-chip');
+  if (chip && !fxc.hidden.has(chip.dataset.code)) { fxc.hover = chip.dataset.code; fxcApplyHover(); }
+});
+$('#fxc-legend').addEventListener('pointerleave', () => { fxc.hover = null; fxcApplyHover(); });
+
+$('#fxc-ranges').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-range]');
+  if (!b) return;
+  fxc.range = b.dataset.range;
+  store.set('fxcRange', fxc.range);
+  if (fxc.range === 'custom') {
+    // 직접 설정을 처음 열면 지금 보고 있는 기간으로 채워둠
+    if (!$('#fxc-from').value && fxc.data) { $('#fxc-from').value = fxc.data.start; $('#fxc-to').value = fxc.data.end; }
+    fxcSyncControls();
+    return;
+  }
+  loadFxChart();
+});
+
+$('#fxc-custom').addEventListener('submit', (e) => {
+  e.preventDefault();
+  store.set('fxcFrom', $('#fxc-from').value);
+  store.set('fxcTo', $('#fxc-to').value);
+  loadFxChart();
+});
+
+(function initFxChart() {
+  const today = isoDate(new Date());
+  const min = new Date(); min.setFullYear(min.getFullYear() - 10);
+  ['#fxc-from', '#fxc-to'].forEach((s) => { $(s).max = today; $(s).min = isoDate(min); });
+  $('#fxc-from').value = store.get('fxcFrom', '');
+  $('#fxc-to').value = store.get('fxcTo', '') || today;
+})();
+
+let fxcResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(fxcResizeTimer);
+  fxcResizeTimer = setTimeout(() => { if (!$('#view-exchange').hidden) drawFxChart(); }, 150);
+});
+
 
 // =====================================================================
 // 부동산 (상세)

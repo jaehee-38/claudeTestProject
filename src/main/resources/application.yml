@@ -75,6 +75,9 @@ invest:
   koreaexim:
     auth-key: ${KOREAEXIM_AUTH_KEY:}
     url: ${KOREAEXIM_URL:https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON}
+  # 환율 그래프용 과거 환율. 유럽중앙은행(ECB) 기준환율, 영업일 하루 1번 갱신, 키 필요 없음
+  frankfurter:
+    url: ${FRANKFURTER_URL:https://api.frankfurter.dev/v1}
   kis:
     app-key: ${KIS_APP_KEY:}
     app-secret: ${KIS_APP_SECRET:}

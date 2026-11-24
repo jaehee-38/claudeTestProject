@@ -3,11 +3,13 @@ package com.example.firstproject.controller.user;
 import com.example.firstproject.config.InvestProperties;
 import com.example.firstproject.dto.AptTradeDto;
 import com.example.firstproject.dto.ExchangeRateDto;
+import com.example.firstproject.dto.FxHistoryDto;
 import com.example.firstproject.dto.GoldPriceDto;
 import com.example.firstproject.dto.KisBalanceDto;
 import com.example.firstproject.dto.StockQuoteDto;
 import com.example.firstproject.dto.SubscriptionListRes;
 import com.example.firstproject.service.ExchangeService;
+import com.example.firstproject.service.FxHistoryService;
 import com.example.firstproject.service.GoldService;
 import com.example.firstproject.service.RealEstateService;
 import com.example.firstproject.service.StockService;
@@ -32,6 +34,7 @@ public class MarketController {
     private final InvestProperties props;
     private final GoldService goldService;
     private final ExchangeService exchangeService;
+    private final FxHistoryService fxHistoryService;
     private final StockService stockService;
     private final RealEstateService realEstateService;
     private final SubscriptionService subscriptionService;
@@ -57,6 +60,12 @@ public class MarketController {
     @GetMapping("/exchange")
     public ExchangeRateDto exchange() {
         return exchangeService.latest();
+    }
+
+    // GET /api/exchange/history?from=2026-08-24&to=2026-11-24  (주요 통화, 그래프용)
+    @GetMapping("/exchange/history")
+    public FxHistoryDto exchangeHistory(@RequestParam String from, @RequestParam(required = false) String to) {
+        return fxHistoryService.history(from, to);
     }
 
     // GET /api/stocks/quote?code=005930

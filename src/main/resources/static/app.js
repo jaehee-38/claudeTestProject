@@ -1,6 +1,45 @@
 'use strict';
 
 // =====================================================================
+// 테마 (라이트 / 다크 모드)
+// =====================================================================
+
+(function initTheme() {
+  const saved = localStorage.getItem('theme'); // 'dark' | 'light' | null
+  const isDark = saved === 'dark';              // 기본값 = 라이트
+  if (isDark) document.documentElement.setAttribute('data-theme', 'dark');
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById('theme-toggle');
+    const icon   = document.getElementById('theme-icon');
+    const label  = document.getElementById('theme-label');
+    if (!toggle) return;
+
+    function applyTheme(dark) {
+      if (dark) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        icon.textContent  = '🌙';
+        label.textContent = '다크';
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        icon.textContent  = '☀️';
+        label.textContent = '라이트';
+        localStorage.setItem('theme', 'light');
+      }
+    }
+
+    // 초기 UI 동기화
+    applyTheme(isDark);
+
+    toggle.addEventListener('click', () => {
+      const nowDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      applyTheme(!nowDark);
+    });
+  });
+})();
+
+// =====================================================================
 // 공통 유틸
 // =====================================================================
 

@@ -1,5 +1,43 @@
 'use strict';
 
+// =====================================================================
+// 테마 (라이트 / 다크 모드) — app.js 와 동일한 로직, localStorage 공유
+// =====================================================================
+
+(function initTheme() {
+  const saved = localStorage.getItem('theme');
+  const isDark = saved === 'dark';
+  if (isDark) document.documentElement.setAttribute('data-theme', 'dark');
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById('theme-toggle');
+    const icon   = document.getElementById('theme-icon');
+    const label  = document.getElementById('theme-label');
+    if (!toggle) return;
+
+    function applyTheme(dark) {
+      if (dark) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        icon.textContent  = '🌙';
+        label.textContent = '다크';
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        icon.textContent  = '☀️';
+        label.textContent = '라이트';
+        localStorage.setItem('theme', 'light');
+      }
+    }
+
+    applyTheme(isDark);
+
+    toggle.addEventListener('click', () => {
+      const nowDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      applyTheme(!nowDark);
+    });
+  });
+})();
+
 // 관리자 화면. API 는 모두 /admin/api/** (로그인 세션 쿠키가 자동으로 같이 감)
 
 const $ = (sel) => document.querySelector(sel);

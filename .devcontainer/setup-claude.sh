@@ -18,8 +18,9 @@ link_persist() {
   ln -s "$dest" "$src"
 }
 
-mkdir -p "$PERSIST_DIR/.claude"
 link_persist "$HOME/.claude" "$PERSIST_DIR/.claude"
+# 옮길 기존 폴더가 없었던 경우 링크 대상 폴더를 만들어 둠
+mkdir -p "$PERSIST_DIR/.claude"
 [ -e "$PERSIST_DIR/.claude.json" ] || [ -e "$HOME/.claude.json" ] || echo '{}' > "$PERSIST_DIR/.claude.json"
 link_persist "$HOME/.claude.json" "$PERSIST_DIR/.claude.json"
 

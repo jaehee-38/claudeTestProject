@@ -8,7 +8,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "invest")
 public record InvestProperties(DataGoKr dataGoKr, Koreaexim koreaexim, Kis kis) {
 
-    public record DataGoKr(String serviceKey, String goldUrl, String aptTradeUrl) {
+    public record DataGoKr(String serviceKey, String goldUrl, String aptTradeUrl,
+                           String applyhomeUrl, String lhNoticeUrl) {
         public boolean configured() {
             return hasText(serviceKey);
         }

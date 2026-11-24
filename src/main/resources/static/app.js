@@ -107,6 +107,7 @@ const data = {
   exchange: () => cached('exchange', () => api('/api/exchange'), 5 * 60_000),
   watchlist: () => cached('watchlist', () => api('/api/watchlist'), 5 * 60_000),
   quote: (code) => cached(`quote:${code}`, () => api(`/api/stocks/quote?code=${encodeURIComponent(code)}`), 30_000),
+  subscriptions: () => cached('subscriptions', () => api('/api/subscriptions'), 10 * 60_000),
   apt: (lawdCd, ym) => cached(`apt:${lawdCd}:${ym}`,
     () => api(`/api/real-estate/apt-trades?lawdCd=${encodeURIComponent(lawdCd)}&dealYm=${encodeURIComponent(ym)}`), 10 * 60_000),
 };
@@ -149,6 +150,7 @@ const views = {
   gold: renderGoldView,
   exchange: renderExchangeView,
   realestate: renderRealEstateView,
+  subscription: renderSubscriptionView,
   invest: renderInvestView,
 };
 
@@ -197,6 +199,7 @@ function renderHome() {
   dashExchange();
   dashStocks();
   dashRealEstate();
+  dashSubscription();
 }
 
 function allocBar(allocation) {
@@ -923,6 +926,138 @@ function drawRealEstate() {
       <td class="num"><b>${manwon(t.dealAmount)}</b></td>
       <td class="num">${t.buildYear ?? '-'}</td>
     </tr>`).join('');
+}
+
+// =====================================================================
+// 청약 (청약홈 + LH 공고)
+// =====================================================================
+
+const SUB_SOURCE = { APPLYHOME: '청약홈', LH: 'LH' };
+
+/** 상태 문자열을 open / soon / closed 세 묶음으로 (LH 는 상태 이름이 여러 가지라서) */
+function subGroup(status) {
+  const s = status || '';
+  if (s.includes('접수중')) return 'open';
+  if (s.includes('예정') || s === '공고중') return 'soon';
+  if (s.includes('마감') || s.includes('완료') || s.includes('발표')) return 'closed';
+  return 'soon';
+}
+
+function subBadge(status) {
+  return `<span class="st st-${subGroup(status)}">${esc(status || '-')}</span>`;
+}
+
+const fmtMd = (d) => (d ? esc(d.slice(5).replace('-', '.')) : '');
+
+function subPeriod(n) {
+  if (n.receiptStart && n.receiptEnd) return `${fmtMd(n.receiptStart)} ~ ${fmtMd(n.receiptEnd)}`;
+  if (n.receiptEnd) return `~ ${fmtMd(n.receiptEnd)}`;
+  return '-';
+}
+
+/** 출처 하나만 실패했을 때 보여줄 안내 */
+function subErrorText(errors) {
+  return Object.entries(errors || {})
+    .map(([src, msg]) => `${SUB_SOURCE[src] || src}: ${msg}`)
+    .join('\n');
+}
+
+let subData = null;
+
+function renderSubscriptionView() {
+  loadSubscriptions();
+}
+
+async function loadSubscriptions() {
+  const tbody = $('#sub-rows');
+  if (!subData) emptyRow(tbody, 9, '불러오는 중…');
+  showMsg($('#sub-msg'), '');
+  try {
+    subData = await data.subscriptions();
+    const regions = [...new Set(subData.items.map((n) => n.region).filter(Boolean))].sort();
+    const sel = $('#sub-region');
+    const keep = sel.value;
+    sel.innerHTML = '<option value="">지역 전체</option>'
+      + regions.map((r) => `<option value="${esc(r)}">${esc(r)}</option>`).join('');
+    sel.value = regions.includes(keep) ? keep : '';
+    showMsg($('#sub-msg'), subErrorText(subData.errors));
+    drawSubscriptions();
+  } catch (err) {
+    subData = null;
+    $('#sub-summary').innerHTML = '';
+    emptyRow(tbody, 9, '불러오지 못했습니다.');
+    showMsg($('#sub-msg'), err.message);
+  }
+}
+
+function drawSubscriptions() {
+  if (!subData) return;
+  const source = $('#sub-source').value;
+  const group = $('#sub-status').value;
+  const region = $('#sub-region').value;
+  const q = $('#sub-filter').value.trim().replace(/\s/g, '');
+  const rows = subData.items.filter((n) => (!source || n.source === source)
+    && (!group || subGroup(n.status) === group)
+    && (!region || n.region === region)
+    && (!q || (n.name || '').replace(/\s/g, '').includes(q)));
+
+  const count = (g) => rows.filter((n) => subGroup(n.status) === g).length;
+  $('#sub-summary').innerHTML = `
+    <div class="card"><div class="label">공고</div><div class="value">${nf0.format(rows.length)}건</div></div>
+    <div class="card"><div class="label">접수중</div><div class="value">${nf0.format(count('open'))}건</div></div>
+    <div class="card"><div class="label">접수예정 · 공고중</div><div class="value">${nf0.format(count('soon'))}건</div></div>
+    <div class="card"><div class="label">마감</div><div class="value">${nf0.format(count('closed'))}건</div></div>`;
+
+  const tbody = $('#sub-rows');
+  if (!rows.length) {
+    emptyRow(tbody, 9, subData.items.length ? '조건에 맞는 공고가 없습니다.' : '최근 60일 공고가 없습니다.');
+    return;
+  }
+  tbody.innerHTML = rows.map((n) => {
+    const safeUrl = /^https?:\/\//.test(n.url || '') ? n.url : null;
+    const title = safeUrl
+      ? `<a class="lnk" href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">${esc(n.name)}</a>`
+      : esc(n.name);
+    return `
+    <tr class="${subGroup(n.status) === 'closed' ? 'dim' : ''}">
+      <td>${subBadge(n.status)}</td>
+      <td>${esc(SUB_SOURCE[n.source] || n.source)}</td>
+      <td>${esc(n.category || '-')}</td>
+      <td>${title}${n.address ? `<div class="muted small">${esc(n.address)}</div>` : ''}</td>
+      <td>${esc(n.region || '-')}</td>
+      <td class="num">${n.households == null ? '-' : nf0.format(n.households)}</td>
+      <td>${esc(n.noticeDate || '-')}</td>
+      <td>${subPeriod(n)}</td>
+      <td>${n.winnerDate ? fmtMd(n.winnerDate) : '-'}</td>
+    </tr>`;
+  }).join('');
+}
+
+$('#sub-form').addEventListener('submit', (e) => e.preventDefault());
+['#sub-source', '#sub-status', '#sub-region'].forEach((s) => $(s).addEventListener('change', drawSubscriptions));
+$('#sub-filter').addEventListener('input', drawSubscriptions);
+$('#sub-refresh').addEventListener('click', () => { invalidate('subscriptions'); loadSubscriptions(); });
+
+async function dashSubscription() {
+  const body = $('#d-subscription .dcard-body');
+  body.innerHTML = skeleton('sm', 'lg', 'md');
+  try {
+    const res = await data.subscriptions();
+    const open = res.items.filter((n) => subGroup(n.status) === 'open');
+    const soon = res.items.filter((n) => subGroup(n.status) === 'soon');
+    if (!res.items.length && Object.keys(res.errors || {}).length) {
+      body.innerHTML = `<div class="derr"><b>불러오지 못했습니다</b>${esc(subErrorText(res.errors))}</div>`;
+      return;
+    }
+    const next = open.concat(soon).slice(0, 3);
+    body.innerHTML = `
+      <div class="label muted small">청약홈 · LH 최근 60일</div>
+      <div class="big">접수중 ${nf0.format(open.length)}건</div>
+      <div class="muted small">접수예정 · 공고중 ${nf0.format(soon.length)}건</div>
+      ${next.length ? `<div class="dnote">${next.map((n) => esc(n.name)).join(' · ')}</div>` : ''}`;
+  } catch (e) {
+    body.innerHTML = cardError(e);
+  }
 }
 
 // =====================================================================

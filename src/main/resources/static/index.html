@@ -33,6 +33,7 @@
     <a class="tab" href="#/gold" data-route="gold">금</a>
     <a class="tab" href="#/exchange" data-route="exchange">환율</a>
     <a class="tab" href="#/realestate" data-route="realestate">부동산</a>
+    <a class="tab" href="#/subscription" data-route="subscription">청약</a>
     <a class="tab" href="#/invest" data-route="invest">모의투자</a>
   </nav>
 
@@ -59,6 +60,10 @@
         </div>
         <a class="dcard" href="#/realestate" id="d-realestate">
           <div class="dcard-head"><h2>부동산</h2><span class="more">자세히 →</span></div>
+          <div class="dcard-body"></div>
+        </a>
+        <a class="dcard" href="#/subscription" id="d-subscription">
+          <div class="dcard-head"><h2>청약</h2><span class="more">자세히 →</span></div>
           <div class="dcard-body"></div>
         </a>
       </div>
@@ -178,6 +183,38 @@
           <tbody id="re-rows"></tbody>
         </table>
       </div>
+    </section>
+
+    <!-- ================= 청약 ================= -->
+    <section id="view-subscription" class="view" hidden>
+      <div class="panel-head">
+        <h2>청약 공고 <span class="muted small">청약홈 · LH · 최근 60일 공고</span></h2>
+        <button id="sub-refresh" class="btn ghost">새로고침</button>
+      </div>
+      <form id="sub-form" class="inline-form wrap">
+        <select id="sub-source">
+          <option value="">출처 전체</option>
+          <option value="APPLYHOME">청약홈</option>
+          <option value="LH">LH</option>
+        </select>
+        <select id="sub-status">
+          <option value="">상태 전체</option>
+          <option value="open">접수중</option>
+          <option value="soon">접수예정 · 공고중</option>
+          <option value="closed">마감</option>
+        </select>
+        <select id="sub-region"><option value="">지역 전체</option></select>
+        <input id="sub-filter" placeholder="단지명 · 공고명 검색" autocomplete="off">
+      </form>
+      <div id="sub-summary" class="cards"></div>
+      <div id="sub-msg" class="msg" hidden></div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>상태</th><th>출처</th><th>구분</th><th>단지 · 공고명</th><th>지역</th><th class="num">세대수</th><th>공고일</th><th>접수기간</th><th>당첨발표</th></tr></thead>
+          <tbody id="sub-rows"></tbody>
+        </table>
+      </div>
+      <p class="muted small">청약홈은 접수 시작일·마감일로, LH는 LH가 내려주는 공고 상태로 표시합니다. LH 공고의 날짜는 공고 마감일입니다. 정확한 일정은 공고 원문에서 확인하세요.</p>
     </section>
 
     <!-- ================= 모의투자 ================= -->

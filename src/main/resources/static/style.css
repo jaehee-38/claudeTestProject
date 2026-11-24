@@ -261,3 +261,9 @@ a.dcard:hover, .dcard:has(.dcard-head a:hover) { border-color: color-mix(in srgb
 .side-opt.buy:has(input:checked) { border-color: var(--up); color: var(--up); background: rgba(214,48,74,.07); }
 .side-opt.sell:has(input:checked) { border-color: var(--down); color: var(--down); background: rgba(38,103,217,.07); }
 .side-opt input { accent-color: var(--accent); }
+
+/* ---------- 청약 ---------- */
+.st { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--surface-2); color: var(--text-sub); }
+.st-open { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.st-soon { background: color-mix(in srgb, var(--up) 14%, transparent); color: var(--up); }
+.data tr.dim td { color: var(--text-sub); }

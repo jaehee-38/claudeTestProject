@@ -6,10 +6,12 @@ import com.example.firstproject.dto.ExchangeRateDto;
 import com.example.firstproject.dto.GoldPriceDto;
 import com.example.firstproject.dto.KisBalanceDto;
 import com.example.firstproject.dto.StockQuoteDto;
+import com.example.firstproject.dto.SubscriptionListRes;
 import com.example.firstproject.service.ExchangeService;
 import com.example.firstproject.service.GoldService;
 import com.example.firstproject.service.RealEstateService;
 import com.example.firstproject.service.StockService;
+import com.example.firstproject.service.SubscriptionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,6 +34,7 @@ public class MarketController {
     private final ExchangeService exchangeService;
     private final StockService stockService;
     private final RealEstateService realEstateService;
+    private final SubscriptionService subscriptionService;
 
     /** 어떤 API 키가 설정됐는지 (키 값은 내려주지 않음) */
     @GetMapping("/status")
@@ -72,5 +75,11 @@ public class MarketController {
     @GetMapping("/real-estate/apt-trades")
     public List<AptTradeDto> aptTrades(@RequestParam String lawdCd, @RequestParam String dealYm) {
         return realEstateService.aptTrades(lawdCd, dealYm);
+    }
+
+    // GET /api/subscriptions  (청약홈 + LH 청약 공고, 최근 60일)
+    @GetMapping("/subscriptions")
+    public SubscriptionListRes subscriptions() {
+        return subscriptionService.notices();
     }
 }

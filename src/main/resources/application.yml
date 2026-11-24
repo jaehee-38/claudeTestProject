@@ -67,6 +67,11 @@ invest:
     service-key: ${DATA_GO_KR_SERVICE_KEY:}
     gold-url: ${DATA_GO_KR_GOLD_URL:https://apis.data.go.kr/1160100/GetGeneralProductInfoService_V2/getGoldPriceInfo_V2}
     apt-trade-url: ${DATA_GO_KR_APT_TRADE_URL:https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade}
+    # 청약 공고 (같은 서비스키 사용, 공공데이터포털에서 API별로 활용신청 필요)
+    #  - 한국부동산원_청약홈 분양정보 조회 서비스 (APT 분양공고 상세)
+    applyhome-url: ${DATA_GO_KR_APPLYHOME_URL:https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail}
+    #  - 한국토지주택공사_분양임대공고문 조회 서비스
+    lh-notice-url: ${DATA_GO_KR_LH_NOTICE_URL:https://apis.data.go.kr/B552555/lhLeaseNoticeInfo1/lhLeaseNoticeInfo1}
   koreaexim:
     auth-key: ${KOREAEXIM_AUTH_KEY:}
     url: ${KOREAEXIM_URL:https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON}

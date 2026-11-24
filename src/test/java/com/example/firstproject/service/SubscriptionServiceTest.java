@@ -57,6 +57,8 @@ class SubscriptionServiceTest {
                     "CLSG_DT":"2026.12.05","PAN_SS":"접수중","DTL_URL":"https://apply.lh.or.kr/x","ALL_CNT":"3"},
                    {"PAN_ID":"0000060002","PAN_NM":"세종 단독주택용지","UPP_AIS_TP_NM":"토지",
                     "CNP_CD_NM":"세종특별자치시","PAN_NT_ST_DT":"2026.11.18","CLSG_DT":"2026.11.30","PAN_SS":"공고중"},
+                   {"PAN_ID":"0000060004","PAN_NM":"울산 관리동 가정어린이집 운영자 모집","UPP_AIS_TP_NM":"임대주택",
+                    "AIS_TP_CD_NM":"가정어린이집","CNP_CD_NM":"울산광역시","PAN_NT_ST_DT":"2026.11.18","PAN_SS":"공고중"},
                    {"PAN_ID":"0000060003","PAN_NM":"서울 신혼희망타운","UPP_AIS_TP_NM":"분양주택",
                     "CNP_CD_NM":"서울특별시","PAN_NT_ST_DT":"2026.11.01","CLSG_DT":"2026.11.10"}
                  ]}]""");
@@ -94,6 +96,10 @@ class SubscriptionServiceTest {
         assertThat(SubscriptionService.date("")).isNull();
         assertThat(SubscriptionService.shortRegion("전라남도")).isEqualTo("전남");
         assertThat(SubscriptionService.shortRegion("부산광역시")).isEqualTo("부산");
+        assertThat(SubscriptionService.shortRegion("전북특별자치도")).isEqualTo("전북");
+        assertThat(SubscriptionService.shortRegion("전남광주통합특별시")).isEqualTo("광주·전남");
+        assertThat(SubscriptionService.shortRegion("대구광역시 외")).isEqualTo("대구 외");
+        assertThat(SubscriptionService.shortRegion("전국")).isEqualTo("전국");
         assertThat(SubscriptionService.statusOf("2026-12-01", "2026-12-03", TODAY)).isEqualTo("접수예정");
     }
 

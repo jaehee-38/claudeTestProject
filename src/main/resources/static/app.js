@@ -937,8 +937,8 @@ const SUB_SOURCE = { APPLYHOME: '청약홈', LH: 'LH' };
 /** 상태 문자열을 open / soon / closed 세 묶음으로 (LH 는 상태 이름이 여러 가지라서) */
 function subGroup(status) {
   const s = status || '';
-  if (s.includes('접수중')) return 'open';
-  if (s.includes('예정') || s === '공고중') return 'soon';
+  if (s.includes('접수중') || s === '상담요청') return 'open';
+  if (s.includes('예정') || s.includes('공고중')) return 'soon';
   if (s.includes('마감') || s.includes('완료') || s.includes('발표')) return 'closed';
   return 'soon';
 }

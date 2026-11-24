@@ -128,7 +128,7 @@ public class SubscriptionService {
     private List<SubscriptionNoticeDto> fetchLh(LocalDate today) {
         InvestProperties.DataGoKr cfg = requireKey();
         List<SubscriptionNoticeDto> all = new ArrayList<>();
-        int pageSize = 100;
+        int pageSize = 1000; // 60일치가 보통 500~600건이라 대부분 한 번에 끝납니다
         for (int page = 1; page <= 5; page++) {
             URI uri = UriComponentsBuilder.fromHttpUrl(cfg.lhNoticeUrl())
                     .queryParam("serviceKey", DataGoKr.encodeKey(cfg.serviceKey()))
@@ -139,22 +139,33 @@ public class SubscriptionService {
                     .build(true)
                     .toUri();
             JsonNode root = getJson(uri, "LH 공고");
-            List<SubscriptionNoticeDto> rows = parseLh(root, today);
-            all.addAll(rows);
-            if (rows.size() < pageSize) break;
+            all.addAll(parseLh(root, today));
+            // 토지·상가를 걸러낸 뒤 건수가 아니라 원본 건수로 마지막 페이지를 판단합니다
+            List<JsonNode> raw = lhRows(root);
+            int total = raw.isEmpty() ? 0 : intOrZero(text(raw.get(0), "ALL_CNT"));
+            if (raw.size() < pageSize || page * pageSize >= total) break;
         }
         return all;
     }
 
+    /** 청약(주택 공급)이 아닌 LH 공고: 토지 매각, 상가 임대, 어린이집 운영자 모집 */
+    private static final List<String> LH_EXCLUDE = List.of("토지", "상가", "어린이집");
+
     /**
      * LH 응답은 [{"dsSch":[…]}, {"resHeader":[…], "dsList":[…]}] 처럼 배열 안에 섞여 오므로
-     * 어디에 있든 dsList 를 찾아 읽습니다. 토지·상가 공고는 청약 대상이 아니라 뺍니다.
+     * 어디에 있든 dsList 를 찾아 읽습니다.
      */
+    static List<JsonNode> lhRows(JsonNode root) {
+        return root.findValues("dsList").stream().flatMap(v -> iterable(v).stream()).toList();
+    }
+
     static List<SubscriptionNoticeDto> parseLh(JsonNode root, LocalDate today) {
         List<SubscriptionNoticeDto> out = new ArrayList<>();
-        for (JsonNode n : root.findValues("dsList").stream().flatMap(v -> iterable(v).stream()).toList()) {
+        for (JsonNode n : lhRows(root)) {
             String upper = text(n, "UPP_AIS_TP_NM");
-            if (upper != null && (upper.contains("토지") || upper.contains("상가"))) continue;
+            String type = text(n, "AIS_TP_CD_NM");
+            String both = (upper == null ? "" : upper) + "|" + (type == null ? "" : type);
+            if (LH_EXCLUDE.stream().anyMatch(both::contains)) continue;
             String noticeDate = date(text(n, "PAN_NT_ST_DT"));
             String closeDate = date(text(n, "CLSG_DT"));
             String status = text(n, "PAN_SS");
@@ -162,7 +173,7 @@ public class SubscriptionService {
                     LH,
                     text(n, "PAN_ID"),
                     text(n, "PAN_NM"),
-                    firstNonNull(text(n, "AIS_TP_CD_NM"), upper),
+                    firstNonNull(type, upper),
                     shortRegion(text(n, "CNP_CD_NM")),
                     null,
                     null, // 공고문 목록에는 세대수가 없음 (ALL_CNT 는 검색 결과 전체 건수)
@@ -178,7 +189,9 @@ public class SubscriptionService {
 
     // ------------------------------------------------------------------ 합치기
 
-    private static final Map<String, Integer> STATUS_ORDER = Map.of("접수중", 0, "접수예정", 1, "공고중", 1);
+    // LH 상태값: 접수중, 상담요청(매입임대 상시 상담), 공고중, 정정공고중, 접수마감
+    private static final Map<String, Integer> STATUS_ORDER = Map.of(
+            "접수중", 0, "상담요청", 0, "접수예정", 1, "공고중", 1, "정정공고중", 1);
 
     /** 같은 단지가 양쪽에 올라온 경우 청약홈 쪽만 남기고, 접수중 → 예정 → 마감 순으로 정렬 */
     static List<SubscriptionNoticeDto> merge(List<SubscriptionNoticeDto> applyhome, List<SubscriptionNoticeDto> lh) {
@@ -268,18 +281,38 @@ public class SubscriptionService {
         return digits.substring(0, 4) + "-" + digits.substring(4, 6) + "-" + digits.substring(6, 8);
     }
 
-    /** "서울특별시" → "서울", "경기도" → "경기" (청약홈 표기와 맞춤) */
+    // 긴 이름부터 확인해야 "전남광주통합특별시"가 "광주"보다 먼저 잡힙니다
+    private static final List<Map.Entry<String, String>> REGION_NAMES = List.of(
+            Map.entry("전남광주", "광주·전남"),
+            Map.entry("충청북", "충북"), Map.entry("충청남", "충남"), Map.entry("충북", "충북"), Map.entry("충남", "충남"),
+            Map.entry("전라북", "전북"), Map.entry("전라남", "전남"), Map.entry("전북", "전북"), Map.entry("전남", "전남"),
+            Map.entry("경상북", "경북"), Map.entry("경상남", "경남"), Map.entry("경북", "경북"), Map.entry("경남", "경남"),
+            Map.entry("서울", "서울"), Map.entry("부산", "부산"), Map.entry("대구", "대구"), Map.entry("인천", "인천"),
+            Map.entry("광주", "광주"), Map.entry("대전", "대전"), Map.entry("울산", "울산"), Map.entry("세종", "세종"),
+            Map.entry("경기", "경기"), Map.entry("강원", "강원"), Map.entry("제주", "제주"));
+
+    /**
+     * LH 지역명을 청약홈 표기에 맞춤.
+     * "서울특별시" → "서울", "전북특별자치도" → "전북", "대구광역시 외" → "대구 외", "전국" → "전국"
+     */
     static String shortRegion(String s) {
         if (s == null) return null;
-        return s.replaceAll("(특별자치시|특별자치도|특별시|광역시|도)$", "")
-                .replace("충청북", "충북").replace("충청남", "충남")
-                .replace("전라북", "전북").replace("전라남", "전남")
-                .replace("경상북", "경북").replace("경상남", "경남");
+        String name = s.trim();
+        String suffix = name.endsWith(" 외") ? " 외" : "";
+        for (Map.Entry<String, String> e : REGION_NAMES) {
+            if (name.startsWith(e.getKey())) return e.getValue() + suffix;
+        }
+        return name;
     }
 
     private static Integer intOrNull(String s) {
         BigDecimal d = Nums.parse(s);
         return d == null ? null : d.intValue();
+    }
+
+    private static int intOrZero(String s) {
+        Integer v = intOrNull(s);
+        return v == null ? 0 : v;
     }
 
     private static String firstNonNull(String a, String b) {

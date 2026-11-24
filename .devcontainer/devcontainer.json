@@ -1,8 +1,17 @@
 {
   "name": "claudeTestProject",
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["anthropic.claude-code"]
+    }
+  },
   "remoteEnv": {
     "JAVA_HOME": "/usr/local/sdkman/candidates/java/21.0.13.0+2-ms",
     "PATH": "/usr/local/sdkman/candidates/java/21.0.13.0+2-ms/bin:${containerEnv:PATH}"
   },
+  "postCreateCommand": "bash .devcontainer/setup-claude.sh",
   "postStartCommand": "bash .devcontainer/generate-env.sh"
 }
